@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "get-stock"
+version = "0.1.0"
+description = ""
+authors = ["yeeyeeeyee <aagg50211@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+twstock = "^1.4.0"
+xlwings = "^0.33.15"
+requests = "^2.32.4"
+beautifulsoup4 = "^4.13.4"
+pandas = "^2.3.0"
+lxml = "^5.4.0"
+openpyxl = "^3.1.5"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
