@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 import xlwings as xw
 import threading
 import time
@@ -40,31 +41,42 @@ class end:
         
 
     #資料
-    def yesterday_close(self,soup):
+    def yesterday_close(self,soup:BeautifulSoup) -> None:
         close=soup.find("span",class_="Fw(600) Fz(16px)--mobile Fz(14px) D(f) Ai(c)")
-        self.昨收=close.text
-        print(f"昨收:{close.text}")
+        if close :
+            self.昨收=close.text
+            print(f"昨收:{close.text}")
+        else:
+            print("[警告] 找不到昨收")
+        
+        
                 
     #管理費
-    def ManagementFee(self,soup):
+    def ManagementFee(self,soup:BeautifulSoup) -> None:
         elements =soup.find("div",class_="Py(8px) Pstart(12px) Bxz(bb) etf-management-fee")
-        if elements.text!="":
+        if elements:
             self.管理費=elements.text
-        print(f"管理費:{elements.text}")
+            print(f"管理費:{elements.text}")
+        else:
+            print("[警告] 找不到管理費")
 
-    def 股息發放日_ETF(self,soup):
+    def 股息發放日_ETF(self,soup: BeautifulSoup) -> None:
         elements =soup.find_all("div",class_="table-grid Mb(20px) row-fit-half")
 
         second_element=elements[0]
+        if not isinstance(second_element, Tag):
+            return
         desired_elements=second_element.find_all("div",class_="Py(8px) Pstart(12px) Bxz(bb)")
         self.股息發放日=desired_elements[-1].text
         print(f'股息發放日:{desired_elements[-1].text}')
     
         
     #-------------------------------------------------------------------------------------------
-    def 股息發放日_person(self,soup):
+    def 股息發放日_person(self,soup: BeautifulSoup) -> None:
         elements =soup.find_all("div",class_="table-grid Mb(20px) row-fit-half", attrs={"style": True})
         second_element=elements[1]
+        if not isinstance(second_element, Tag):
+            return
         find= second_element.find_all("div",class_="Py(8px) Pstart(12px) Bxz(bb)")
         self.股息發放日=find[-1].text
         print(f"股息發放日:{find[-1].text}")
@@ -72,82 +84,103 @@ class end:
 
     #市盈率(PE)
     def get_PE(self):
+        # 定义获取市盈率的函数
         url = f"https://histock.tw/stock/{self.code}/%E6%9C%AC%E7%9B%8A%E6%AF%94"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+
+        # 获取网页内容
+        soup = fetch_html(url)
+        # 查找包含市盈率的span元素
         span_elements = soup.find("td", attrs={"style": True})
+        # 如果没有找到span元素，则返回
+        if span_elements is None:
+            return
+        # 将市盈率赋值给self.市盈率
         self.市盈率=span_elements.text
+        # 打印市盈率
         print(f"市盈率:{span_elements.text}")
         
 
     #市淨率
     def get_PB(self):
+        # 获取市净率
         url = f"https://histock.tw/stock/{self.code}/%E8%82%A1%E5%83%B9%E6%B7%A8%E5%80%BC%E6%AF%94"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+        
+        # 获取网页内容
+        soup = fetch_html(url)
+        # 查找包含市净率的span元素
         span_elements = soup.find("td", attrs={"style": True})
+        # 如果没有找到span元素，则返回
+        if span_elements is None:
+            return 
+        # 将市净率赋值给self.市淨率
         self.市淨率=span_elements.text
+        # 打印市净率
         print(f"市淨率:{span_elements.text}")
         
 
     def 財務報表(self):
+        #获取财务报表的url
         url = f"https://histock.tw/stock/{self.code}/%E9%99%A4%E6%AC%8A%E9%99%A4%E6%81%AF"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+        #获取网页内容
+        soup = fetch_html(url)
 
+        #获取网页中的所有td元素
         elements = soup.find_all("td")
+        #如果没有获取到td元素，则返回
+        if elements is []:
+            return 
+        
+
         #除權日
+        #如果除權日不为空，则赋值给self.除權日
         if elements[2].text!="":
             self.除權日=elements[2].text
+        #打印除權日
         print(f'除權日:{elements[2].text}')
+
         #除息日
+        #将除息日的年月日拼接起来，赋值给self.除息日
         self.除息日=f'{elements[1].text}/{elements[3].text}'
+        #打印除息日
         print(f'除息日:{elements[1].text}/{elements[3].text}')
+
         #股票股利
+        #将股票股利赋值给self.股票股利
         self.股票股利=elements[5].text
+        #打印股票股利
         print(f'股票股利:{elements[5].text}')
+
         #現金股利
+        #将現金股利赋值给self.現金股利
         self.現金股利=elements[6].text
+        #打印現金股利
         print(f'現金股利:{elements[6].text}')
+
         #EPS(盈餘)
+        #将EPS(盈餘)赋值给self.盈餘
         self.盈餘=elements[7].text
+        #打印EPS(盈餘)
         print(f'EPS:{elements[7].text}')
+
         #現金殖利率(殖利率)
+        #如果現金殖利率不为空，则赋值给self.殖利率
         if elements[9].text!="":
             self.殖利率=elements[9].text
+        #打印現金殖利率(殖利率)
         print(f'現金殖利率:{elements[9].text}')
         
 
     def 杜邦分析(self):
+        # 获取杜邦分析页面URL
         url = f"https://histock.tw/stock/{self.code}/%E5%A0%B1%E9%85%AC%E7%8E%87"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+        # 获取页面内容
+        soup = fetch_html(url)
 
+        # 获取页面中的所有td元素
         elements = soup.find_all("td")
+        # 如果没有获取到td元素，则返回"-"
+        if elements is []:
+            return 
         #ROE
         self.ROE=elements[1].text
         print(f"ROE:{elements[1].text}")
@@ -157,26 +190,28 @@ class end:
         
 
     #每股淨值
-    def NAVPS(self,soup):
+    def NAVPS(self,soup:BeautifulSoup) -> None:
         elements =soup.find("div",class_="table-grid Mb(20px) row-fit-half", attrs={"style": True})
+        if not isinstance(elements, Tag):
+            return
         second_element=elements.find_all("div",class_="Py(8px) Pstart(12px) Bxz(bb)")
+        if second_element is []:
+            return
+
         self.每股淨值=second_element[-1].text
         print(f"每股淨值:{second_element[-1].text}")
         
         
 
     def 三率(self):
+        #获取毛利率、營益率、稅後淨利率
         url = f"https://histock.tw/stock/{self.code}/%E5%88%A9%E6%BD%A4%E6%AF%94%E7%8E%87"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = fetch_html(url)
 
         elements = soup.find_all("td")
+        if elements is []:
+            return
+
         #毛利率
         self.毛利率=elements[1].text
         print(f"毛利率:{elements[1].text}")
@@ -190,16 +225,11 @@ class end:
 
     def 流速動比率(self):
         url = f"https://histock.tw/stock/{self.code}/%E6%B5%81%E9%80%9F%E5%8B%95%E6%AF%94%E7%8E%87"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = fetch_html(url)
 
         elements = soup.find_all("td")
+        if elements is []:
+            return
         #流動比
         self.流動比率=elements[1].text
         print(f"流動比:{elements[1].text}")
@@ -210,14 +240,7 @@ class end:
 
     def 負債比(self):
         url = f"https://histock.tw/stock/{self.code}/%E8%B2%A0%E5%82%B5%E4%BD%94%E8%B3%87%E7%94%A2%E6%AF%94"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = fetch_html(url)
 
         elements = soup.find_all("td")
         #負債比
@@ -227,16 +250,11 @@ class end:
 
     def get_利息保障倍數(self):
         url = f"https://histock.tw/stock/{self.code}/%E5%88%A9%E6%81%AF%E4%BF%9D%E9%9A%9C%E5%80%8D%E6%95%B8"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = fetch_html(url)
 
         elements = soup.find_all("td")
+        if elements is None:
+            return "-"
         #利息保障倍數
         self.利息保障倍數=elements[1].text
         print(f"利息保障倍數:{elements[1].text}")
@@ -244,16 +262,11 @@ class end:
 
     def 營運週轉天數(self):
         url = f"https://histock.tw/stock/{self.code}/%E7%87%9F%E9%81%8B%E9%80%B1%E8%BD%89%E5%A4%A9%E6%95%B8"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = fetch_html(url)
 
         elements = soup.find_all("td")
+        if elements is []:
+            return 
         #應收帳款收現天數
         self.應收帳款收現天數=elements[1].text
         print(f"應收帳款收現天數:{elements[1].text}")
@@ -264,32 +277,24 @@ class end:
 
     def get_盈餘再投資比(self):
         url = f"https://histock.tw/stock/{self.code}/%E7%9B%88%E9%A4%98%E5%86%8D%E6%8A%95%E8%B3%87%E6%AF%94%E7%8E%87"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = fetch_html(url)
 
         elements = soup.find_all("td")
+        if elements is None:
+            return
         #盈餘再投資比
         self.盈餘再投資比=elements[1].text
         print(f"盈餘再投資比:{elements[1].text}")
 
     def get_現金流(self,url):
         url = url+"/cash-flow-statement"
-        response = requests.get(url,timeout=5)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
-        soup = BeautifulSoup(response.text, "html.parser")
+        soup = fetch_html(url)
 
         li = soup.find_all("li",class_="List(n)")[3]
+        if li is None:
+            return "-"
+        if not isinstance(li, Tag):
+            return "-"
         elements=li.find_all("span")
         self.現金流=elements[1].text
         #現金流
@@ -321,38 +326,38 @@ class end:
 
     #判斷
     def judge(self):
+        #获取股票代码对应的url
         url = f"https://tw.stock.yahoo.com/quote/{self.code}"
-        response = requests.get(url,timeout=5)
-        yahoo = BeautifulSoup(response.text, "html.parser")
+        #获取url对应的html内容
+        yahoo = fetch_html(url)
+        #获取股票代码
         self.current_code = yahoo.find_all("title")
 
         print(self.current_code)
-        #測試當前狀態 抓不到則結束程式
-        try:
-            status_code=statu(response)
-        except:
-            print(f"請求失敗!當前股票{self.current_code}\n狀態碼:{status_code}")
-            exit()
 
         Tw_Or_Two=url
 
         #判斷是否為個股
         url += "/profile"
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, "html.parser")
-
+        #获取url对应的html内容
+        soup = fetch_html(url)
         #yahoo重要行事曆
         elements =soup.find_all("div",class_="table-grid row-fit-half", attrs={"style": True})
 
         #載入資料
         #個股
         if len(elements)==4:
+            #调用person方法
             self.person(yahoo,soup,Tw_Or_Two)
         #ETF
         else:
+            #调用ManagementFee方法
             self.ManagementFee(soup)
+            #调用股息發放日_ETF方法
             self.股息發放日_ETF(soup)
+            #调用財務報表方法
             self.財務報表()
+            #调用yesterday_close方法
             self.yesterday_close(yahoo)
 
         #---------------------------------------
@@ -392,7 +397,7 @@ class end:
             self.現金流,
             self.管理費 ,
         ]
-         #設置P到AM
+        #設置P到AM
         range_address = f"P{self.row}:AN{self.row}"
         #從設置的填入資料
         sheet.range(range_address).value = data
@@ -401,17 +406,14 @@ class end:
 
 
 #連接url如果狀態!=200就重抓一次
-def statu(response):
-    #次數
-    count=0
-    while response.status_code != 200:
-        count+=1
-        if count == 3:
-            break
-        time.sleep(1)
-        response = requests.get(response.url)
-
-    return response.status_code
+def fetch_html(url: str) -> BeautifulSoup:
+    """共用抓取＋重試邏輯，失敗時擲回例外。"""
+    for _ in range(3):  # 尝试3次
+        resp = requests.get(url, timeout=5)  # 发送GET请求，设置超时时间为5秒
+        if resp.status_code == 200:  # 如果状态码为200，表示请求成功
+            return BeautifulSoup(resp.text, "html.parser")  # 返回BeautifulSoup对象
+        time.sleep(1)  # 如果请求失败，等待1秒后重试
+    raise RuntimeError(f"HTTP {resp.status_code}: {url}")  # 如果3次请求都失败，抛出异常
         
     
 
@@ -429,28 +431,17 @@ def update_data(codes:list,sheet):
 
 
 if __name__ == '__main__':
-  def main(file,sheet_name:str=""):
-    try:
-        workbook = xw.Book(file)
-    except:
-        app = xw.App(visible=True, add_book=False)
-        workbook = app.books.open(file)
-    if sheet_name == "":
-        sheet = workbook.sheets.active
-    else:
-        sheet = workbook.sheets[sheet_name]
-    return workbook, sheet
-  workbook, sheet = main("data.xlsx")
-  update_data(["2912","2105","2308"],sheet)
+    def main(file,sheet_name:str=""):
+        try:
+            workbook = xw.Book(file)
+        except:
+            app = xw.App(visible=True, add_book=False)
+            workbook = app.books.open(file)
+        if sheet_name == "":
+            sheet = workbook.sheets.active
+        else:
+            sheet = workbook.sheets[sheet_name]
+        return workbook, sheet
+    workbook, sheet = main("data.xlsx","new title")
+    update_data(["2912","2105","2308"],sheet) 
 
-    
-    
-
-   
-
-
-
-    
-    
-
-   
