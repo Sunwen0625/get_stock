@@ -1,41 +1,27 @@
 import requests
 from bs4 import BeautifulSoup
 from bs4.element import Tag
+from collections.abc import Mapping
 import xlwings as xw
 import threading
 import time
 
-from excel_utils import ExcelSession 
+from .excel_utils import ExcelSession 
+from .settings_loader import load_codes
 
 
-def is_etf(symbol: str) -> bool:
-    """利用 Yahoo Finance Search API 判斷代碼是否為 ETF。
-
-    API: https://query2.finance.yahoo.com/v1/finance/search?q=<symbol>
-    若找不到 API 或 JSON 解析失敗，返回 False（視為個股），並打印警告。
-    """
-    HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; StockScraper/1.0)"}
-    url = f"https://query2.finance.yahoo.com/v1/finance/search?q={symbol}.tw"
-    try:
-        resp = requests.get(url, headers=HEADERS,timeout=5)
-        #resp = requests.get(url,timeout=5)
-        if resp.status_code != 200:
-            raise RuntimeError(f"HTTP {resp.status_code}")
-        data = resp.json()
-        for quote in data.get("quotes", []):
-            #print(quote)
-            # 台股符號通常返回形如 "0050.TW"，先取前段比對
-            if quote.get("typeDisp", "").split(".")[0] == "ETF":
-                return quote.get("quoteType") == "ETF"
-    except Exception as exc:  # noqa: BLE001
-        print(f"[WARN] is_etf({symbol}) API error: {exc}")
-    return False 
 
 #=============================================================
 class end:
-    def __init__(self,code,row):
+    def __init__(
+            self, 
+            code: str, 
+            row: int, 
+            is_etf_flag: bool | None = None
+            ) -> None:
         self.code=code
         self.row=row
+        self._is_etf_flag = is_etf_flag  # ★ 儲存外部傳入的布林值 (True/False/None)
         self.current_code=""
         self.昨收 = "-"
         self.市盈率 = "-"
@@ -326,28 +312,28 @@ class end:
         #現金流
         print(f"現金流:{elements[1].text}")
 
+    def _is_etf(self,symbol: str) -> bool:
+        """利用 Yahoo Finance Search API 判斷代碼是否為 ETF。
 
-    def person(self,yahoo,soup):
-        threads=[]
-        threads.append(threading.Thread(target=self.get_PE))
-        threads.append(threading.Thread(target=self.get_PB))
-        threads.append(threading.Thread(target=self.杜邦分析))
-        threads.append(threading.Thread(target=self.NAVPS,args=(soup,)))
-        threads.append(threading.Thread(target=self.三率))
-        threads.append(threading.Thread(target=self.流速動比率))
-        threads.append(threading.Thread(target=self.負債比))
-        threads.append(threading.Thread(target=self.營運週轉天數))
-        threads.append(threading.Thread(target=self.get_利息保障倍數))
-        threads.append(threading.Thread(target=self.get_盈餘再投資比))
-        threads.append(threading.Thread(target=self.yesterday_close,args=(yahoo,)))
-        threads.append(threading.Thread(target=self.股息發放日_person,args=(soup,)))
-        threads.append(threading.Thread(target=self.get_現金流))
-        threads.append(threading.Thread(target=self.財務報表))
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-    
+        API: https://query2.finance.yahoo.com/v1/finance/search?q=<symbol>
+        若找不到 API 或 JSON 解析失敗，返回 False（視為個股），並打印警告。
+        """
+        HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; StockScraper/1.0)"}
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={symbol}.tw"
+        try:
+            resp = requests.get(url, headers=HEADERS,timeout=5)
+            #resp = requests.get(url,timeout=5)
+            if resp.status_code != 200:
+                raise RuntimeError(f"HTTP {resp.status_code}")
+            data = resp.json()
+            for quote in data.get("quotes", []):
+                #print(quote)
+                # 台股符號通常返回形如 "0050.TW"，先取前段比對
+                if quote.get("typeDisp", "").split(".")[0] == "ETF":
+                    return quote.get("quoteType") == "ETF"
+        except Exception as exc:  # noqa: BLE001
+            print(f"[WARN] is_etf({symbol}) API error: {exc}")
+        return False
 
 
     #判斷
@@ -359,26 +345,52 @@ class end:
         profile_soup = fetch_html(profile_url)
         #获取股票代码
         self.current_code = yahoo_soup.find_all("title")
-
         print(f"\n {self.current_code}")
 
 
         #判斷是否為ETF
-        if is_etf(self.code):
-            #调用ManagementFee方法
+        if self._is_etf_flag is not None:          # 外部已指定 True/False
+            is_etf_result = self._is_etf_flag
+        else:                                      # 否則 fallback 用 API 判斷
+            is_etf_result = self._is_etf(self.code)
+
+        if is_etf_result:
             self._handle_etf(profile_soup, yahoo_soup)
-        else: 
-            #個股 调用person方法
+        else:
             self._handle_stock(profile_soup, yahoo_soup)
 
     def _handle_etf(self, profile_soup: BeautifulSoup, yahoo_soup: BeautifulSoup):
-        self.ManagementFee(profile_soup)
-        self.股息發放日_ETF(profile_soup)
-        self.財務報表()
-        self.yesterday_close(yahoo_soup)
+        threads=[]
+        threads.append(threading.Thread(target=self.ManagementFee, args=(profile_soup,)))
+        threads.append(threading.Thread(target=self.股息發放日_ETF, args=(profile_soup,)))
+        threads.append(threading.Thread(target=self.財務報表))
+        threads.append(threading.Thread(target=self.yesterday_close, args=(yahoo_soup,)))
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
 
     def _handle_stock(self, profile_soup: BeautifulSoup, yahoo_soup: BeautifulSoup):
-        self.person(yahoo_soup, profile_soup)
+        threads=[]
+        threads.append(threading.Thread(target=self.get_PE))
+        threads.append(threading.Thread(target=self.get_PB))
+        threads.append(threading.Thread(target=self.杜邦分析))
+        threads.append(threading.Thread(target=self.NAVPS,args=(profile_soup,)))
+        threads.append(threading.Thread(target=self.三率))
+        threads.append(threading.Thread(target=self.流速動比率))
+        threads.append(threading.Thread(target=self.負債比))
+        threads.append(threading.Thread(target=self.營運週轉天數))
+        threads.append(threading.Thread(target=self.get_利息保障倍數))
+        threads.append(threading.Thread(target=self.get_盈餘再投資比))
+        threads.append(threading.Thread(target=self.yesterday_close,args=(yahoo_soup,)))
+        threads.append(threading.Thread(target=self.股息發放日_person,args=(profile_soup,)))
+        threads.append(threading.Thread(target=self.get_現金流))
+        threads.append(threading.Thread(target=self.財務報表))
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
 
 
         #---------------------------------------
@@ -423,7 +435,21 @@ class end:
 
 #連接url如果狀態!=200就重抓一次
 def fetch_html(url: str) -> BeautifulSoup:
-    """共用抓取＋重試邏輯，失敗時擲回例外。"""
+    """
+    共用抓取＋重試邏輯，失敗時擲回例外。
+
+    该函数用于从指定的URL抓取HTML内容，并使用BeautifulSoup解析。如果请求失败，会尝试重试3次。
+    如果3次请求都失败，则抛出运行时异常。
+
+    参数:
+    url (str): 要抓取的网页的URL。
+
+    返回:
+    BeautifulSoup: 解析后的HTML内容。
+
+    抛出:
+    RuntimeError: 如果3次请求都失败，抛出运行时异常，包含HTTP状态码和URL信息。
+    """
     for _ in range(3):  # 尝试3次
         resp = requests.get(url, timeout=5)  # 发送GET请求，设置超时时间为5秒
         if resp.status_code == 200:  # 如果状态码为200，表示请求成功
@@ -434,19 +460,50 @@ def fetch_html(url: str) -> BeautifulSoup:
     
 
 #盤中抓即時資料
-def update_data(codes:list[str],session: ExcelSession) -> None:
-    stock_data = codes
+def update_data(
+        session: ExcelSession,
+        codes: list[str] | Mapping[str, bool] | None = None
+        ) -> None:
+    """
+    更新Excel表格中的股票数据。
+
+    参数:
+    codes (list[str] | dict[str, str]): 股票代码的列表或字典。
+    session (ExcelSession): 用于操作Excel的会话对象。
+
+    返回:
+    None
+
+    功能描述:
+    1. 将股票代码列表或字典赋值给stock_data变量。
+    2. 初始化行号row为2，表示从Excel表格的第2行开始输入数据。
+    3. 遍历股票代码列表stock_data，对每个股票代码执行以下操作：
+        - 调用end函数获取股票数据对象stock。
+        - 调用stock对象的judge方法进行数据校验。
+        - 调用stock对象的input_data方法将数据输入到Excel会话session中。
+        - 行号row自增1，移动到下一行。
+    4. 最后，调用session的save方法保存对Excel表格的修改。
+    """
+    if codes is None or not codes:
+        codes = load_codes()                       # ← 前面已寫好的設定檔載入器
+        print(f"[INFO] 讀取 setting.json：{codes}")
+
     row = 2
-    for  data in stock_data:
-        stock = end(data, row)
+    if isinstance(codes, Mapping):
+        iterable = codes.items()                   # (code, flag)
+    else:
+        iterable = ((c, None) for c in codes)
+    
+    for code, flag in iterable:
+        stock = end(code, row, flag)
         stock.judge()
         stock.input_data(session)
         row += 1
     # 保存修改
-    session.save()       
+    session.save()
 
 
 
 if __name__ == '__main__':
     with ExcelSession("data.xlsx", "new title") as xls:  # ← 只要這一行
-        update_data(["2912", "2105", "2308","0050"], xls)
+        update_data(xls,["2912", "2105", "2308","0050"])
