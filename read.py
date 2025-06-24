@@ -1,117 +1,140 @@
-import pandas as pd
-from datetime import datetime,time
-import time as t
-import requests
+"""
+stock_runner.py
+主流程：先更新歷史資料 → 開盤期間持續拉即時價格 → 收盤後再次拉即時價格並做分類
+依賴：股票.function.* 相關模組
+"""
+from __future__ import annotations
+
 import json
+import logging
+import time
+from datetime import datetime, time as dtime
+from pathlib import Path
+from typing import Dict, List
 
-from 股票.function import get_stock
-from 股票.function import stock_end
+import pandas as pd
+import requests
+
+from 股票.function import (
+    classification,
+    get_stock,
+    stock_end,
+    stock_cache,
+)
 from 股票.function.excel_utils import ExcelSession
-from 股票.function import classification
-import 股票.error_case as error_case
+
+# ──────────────────────────────
+# 1. 設定與常數
+# ──────────────────────────────
+CONFIG_PATH = Path("setting.json")
+
+CLOSING_TIME: dtime = dtime(13, 40)          # 收盤時間
+REALTIME_POLL_SEC = 3                        # 盤中抓價頻率
+CONN_RETRY_SEC = 5                           # 連線錯誤再試間隔
+MAX_GENERIC_ERRORS = 2                       # 其他例外次數上限
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger(__name__)
 
 
-
-#這裡還有問題
-def opening_stock(data_list, write_file: str, write_sheet: str):
-    # 取得現在的時間
-    now = datetime.now().time()
-    # 設定下午1點半的時間
-    closing_time = time(13, 40)
-
-    error_count = 0  # 错误计数器
-    with ExcelSession(write_file, write_sheet) as xls:
-        
-        while now < closing_time:
-            try:
-                get_stock.update_realtime_data(data_list, xls)
-                t.sleep(3)
-                now = datetime.now().time()
-            except requests.exceptions.ConnectionError as e:
-                print("連接錯誤:", str(e))
-                t.sleep(5)
-            except Exception as e:
-                error_count += 1
-                if error_count >= 2:
-                    error_case.error_case(e)
-                    break      # 避免無窮迴圈
+# ──────────────────────────────
+# 2. 公用工具
+# ──────────────────────────────
+def load_config(path: Path = CONFIG_PATH) -> Dict:
+    with path.open(encoding="utf-8") as fp:
+        return json.load(fp)
 
 
-def reload_data():
-    print("是否重新載入資料 y/n")
-    input_str = input("輸入:")
-    if input_str.lower()  == "y":
-        #get_stock.update_realtime_data(data_list,sheet)
-        reload_data()
-#-------------------------------------------------
-# 讀取 JSON 檔案
-with open('setting.json', 'r',encoding='utf-8') as file:
-    config = json.load(file)
-#讀取
-read_file = config['read_file']
-read_sheet = config['read_sheet']
-
-#寫入
-write_file=config['write_file']
-write_sheet=config['write_sheet']
-#存檔
-save=config['save']
-#等待
-check_wait=config['check_wait']
-ending_wait=config['ending_wait']
+def read_symbols(file: str, sheet: str) -> List[str]:
+    df = pd.read_excel(file, sheet)
+    return df.iloc[:, 1].astype(str).tolist()
 
 
-#-------------------------------------------------------------------------
-# 读取Excel文件
-df = pd.read_excel(read_file,read_sheet)
-
-# 获取第一列数据并转换为字符串列表
-data_list = df.iloc[:, 1].astype(str).tolist()
-
-# 打印列表
-print(data_list)
+def symbols_match_config(symbols: List[str], codes_cfg: Dict[str, bool]) -> bool:
+    """確認 symbols 均存在於 codes_cfg 的 key 內"""
+    return all(sym in codes_cfg for sym in symbols)
 
 
-# 另存为新文件
-if save:
-    import 股票.save_as as save_as
-    save_as.save_as(read_file)
+def prompt_yes_no(msg: str) -> bool:
+    return input(f"{msg} (y/n): ").strip().lower() == "y"
 
 
-#資料
-with ExcelSession(write_file, write_sheet) as xls:
+class FatalError(Exception):
+    """可預期但致命的錯誤 — 直接結束程式。"""
+
+
+# ──────────────────────────────
+# 3. 業務邏輯
+# ──────────────────────────────
+def pull_realtime_until_close(symbols: List[str], xls: ExcelSession) -> None:
+    errors = 0
+    while datetime.now().time() < CLOSING_TIME:
+        try:
+            get_stock.update_realtime_data(symbols, xls)
+            time.sleep(REALTIME_POLL_SEC)
+        except requests.exceptions.ConnectionError as exc:
+            logger.warning("連線錯誤：%s，%d 秒後重試", exc, CONN_RETRY_SEC)
+            time.sleep(CONN_RETRY_SEC)
+        except Exception as exc:  # pylint: disable=broad-except
+            errors += 1
+            logger.exception("未知錯誤（%d/%d）：%s", errors, MAX_GENERIC_ERRORS, exc)
+            if errors >= MAX_GENERIC_ERRORS:
+                raise FatalError("盤中拉價連續失敗次數過多") from exc
+
+
+def run() -> None:
+    cfg = load_config()
+    symbols = read_symbols(cfg["read_file"], cfg["read_sheet"])
+
+    # 若 symbols 不在設定檔 code 區塊，嘗試更新後重新載入
+    if not symbols_match_config(symbols, cfg["code"]):
+        logger.info("symbols 與設定檔不一致，執行 stock_cache.update_code_section()")
+        stock_cache.update_code_section(symbols)
+        cfg = load_config()  # 熱重載
+
+    # 1. 歷史資料
+    with ExcelSession(cfg["write_file"], cfg["write_sheet"]) as xls_hist:
+        try:
+            logger.info("更新歷史資料 …")
+            stock_end.update_data(xls_hist, symbols)
+        except Exception as exc:  # pylint: disable=broad-except
+            raise FatalError("更新歷史資料失敗") from exc
+
+    # 2. 盤中即時資料
+    with ExcelSession(cfg["write_file"], cfg["write_sheet"]) as xls_live:
+        logger.info("開始盤中即時抓價 …")
+        pull_realtime_until_close(symbols, xls_live)
+
+    # 3. 收盤後最後一次拉即時 & 分類
+    with ExcelSession(cfg["write_file"], cfg["write_sheet"]) as xls_final:
+        logger.info("收盤後最後一次更新即時資料 …")
+        get_stock.update_realtime_data(symbols, xls_final)
+
+        if cfg.get("check_wait") and prompt_yes_no("是否再次更新即時資料？"):
+            get_stock.update_realtime_data(symbols, xls_final)
+
+        logger.info("進行資料分類 …")
+        classification.classification(symbols, xls_final)
+
+    if cfg.get("save"):
+        import 股票.save_as as save_as  # 避免循環匯入
+        save_as.save_as(cfg["read_file"])
+
+    if cfg.get("ending_wait"):
+        input("流程完畢，按任意鍵結束…")
+
+
+# ──────────────────────────────
+# 4. 進入點
+# ──────────────────────────────
+if __name__ == "__main__":
     try:
-        print("讀取資料")
-        stock_end.update_data(data_list,xls)
-        print("即時資料-開始:")
-    except Exception as e:
-        error_case.error_case(e)
-
-#盤中
-opening_stock(data_list,write_file=write_file, write_sheet=write_sheet)
-
-
-#-------------------------------------------------------------------------
-try:
-    #最後補齊即時資料
-    with ExcelSession(write_file, write_sheet) as xls2:
-        get_stock.update_realtime_data(data_list, xls2)
-
-        if check_wait:
-                reload_data()
-
-        print("即時資料-結束")
-        print("資料分類-開始")
-    
-        classification.classification(data_list,xls2)
-        print("資料分類-結束")
-    if ending_wait:
-        input("------請按任意鍵結束-------")
-    
-except Exception as e:
-    print("發生錯誤，請檢查程式碼或資料")
-    error_case.error_case(e)
-
-
-
-
+        run()
+    except FatalError as exc:
+        logger.error("致命錯誤：%s", exc)
+    except KeyboardInterrupt:
+        logger.warning("使用者中斷程式")
