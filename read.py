@@ -1,6 +1,6 @@
 """
-stock_runner.py
-主流程：先更新歷史資料 → 開盤期間持續拉即時價格 → 收盤後再次拉即時價格並做分類
+read.py
+主流程：先更新歷史資料 → 收盤後拉價格並做分類
 依賴：股票.function.* 相關模組
 """
 from __future__ import annotations
@@ -27,10 +27,6 @@ from 股票.function.excel_utils import ExcelSession
 # ──────────────────────────────
 CONFIG_PATH = Path("setting.json")
 
-CLOSING_TIME: dtime = dtime(13, 40)          # 收盤時間
-REALTIME_POLL_SEC = 3                        # 盤中抓價頻率
-CONN_RETRY_SEC = 5                           # 連線錯誤再試間隔
-MAX_GENERIC_ERRORS = 2                       # 其他例外次數上限
 
 logging.basicConfig(
     level=logging.INFO,
