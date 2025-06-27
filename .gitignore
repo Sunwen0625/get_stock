@@ -1,1 +1,3 @@
 /getstock
+*.pyc
+/test
