@@ -7,20 +7,19 @@ from __future__ import annotations
 
 import json
 import logging
-import time
-from datetime import datetime, time as dtime
+from datetime import time as dtime
 from pathlib import Path
 from typing import Dict, List
 
 import pandas as pd
-import requests
+
 
 from 股票.function import (
-    classification,
-    get_stock,
     stock_end,
     stock_cache,
+    
 )
+from 股票.function.realtime_market import RealtimeMarket
 from 股票.function.excel_utils import ExcelSession
 
 # ──────────────────────────────
@@ -67,23 +66,6 @@ class FatalError(Exception):
     """可預期但致命的錯誤 — 直接結束程式。"""
 
 
-# ──────────────────────────────
-# 3. 業務邏輯
-# ──────────────────────────────
-def pull_realtime_until_close(symbols: List[str], xls: ExcelSession) -> None:
-    errors = 0
-    while datetime.now().time() < CLOSING_TIME:
-        try:
-            get_stock.update_realtime_data(symbols, xls)
-            time.sleep(REALTIME_POLL_SEC)
-        except requests.exceptions.ConnectionError as exc:
-            logger.warning("連線錯誤：%s，%d 秒後重試", exc, CONN_RETRY_SEC)
-            time.sleep(CONN_RETRY_SEC)
-        except Exception as exc:  # pylint: disable=broad-except
-            errors += 1
-            logger.exception("未知錯誤（%d/%d）：%s", errors, MAX_GENERIC_ERRORS, exc)
-            if errors >= MAX_GENERIC_ERRORS:
-                raise FatalError("盤中拉價連續失敗次數過多") from exc
 
 
 def run() -> None:
@@ -100,25 +82,19 @@ def run() -> None:
     with ExcelSession(cfg["write_file"], cfg["write_sheet"]) as xls_hist:
         try:
             logger.info("更新歷史資料 …")
-            stock_end.update_data(xls_hist, symbols)
+            stock_end.update_data(xls_hist, cfg["code"])
         except Exception as exc:  # pylint: disable=broad-except
             raise FatalError("更新歷史資料失敗") from exc
 
-    # 2. 盤中即時資料
-    with ExcelSession(cfg["write_file"], cfg["write_sheet"]) as xls_live:
-        logger.info("開始盤中即時抓價 …")
-        pull_realtime_until_close(symbols, xls_live)
+    
 
-    # 3. 收盤後最後一次拉即時 & 分類
-    with ExcelSession(cfg["write_file"], cfg["write_sheet"]) as xls_final:
-        logger.info("收盤後最後一次更新即時資料 …")
-        get_stock.update_realtime_data(symbols, xls_final)
-
-        if cfg.get("check_wait") and prompt_yes_no("是否再次更新即時資料？"):
-            get_stock.update_realtime_data(symbols, xls_final)
-
-        logger.info("進行資料分類 …")
-        classification.classification(symbols, xls_final)
+    # 2. 收盤後最後一次拉即時 & 分類
+    RealtimeMarket(
+        codes=symbols,
+        xls_path=cfg["write_file"],
+        sheet_name=cfg["write_sheet"],
+    ).run()
+    
 
     if cfg.get("save"):
         import 股票.save_as as save_as  # 避免循環匯入
