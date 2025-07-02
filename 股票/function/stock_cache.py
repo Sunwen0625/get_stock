@@ -1,5 +1,6 @@
 import json
 import requests
+import twstock
 
 SETTING_FILE = "setting.json"
 
@@ -32,6 +33,8 @@ def save_setting(setting: dict):
 
 def update_code_section(symbols: list[str]):
     """只更新 setting.json 裡的 code 欄位"""
+    # 先更新 twstock 的股票代碼清單
+    twstock.__update_codes()
     setting = load_setting()
     # 若沒有 code 欄位則新增一個空 dict
     code_cache = setting.get("code", {})
