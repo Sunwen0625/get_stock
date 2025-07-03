@@ -61,12 +61,18 @@ class End:
 
     #資料
     def yesterday_close(self,soup:BeautifulSoup) -> None:
-        close=soup.find("span",class_="Fw(600) Fz(16px)--mobile Fz(14px) D(f) Ai(c)")
-        if close :
-            self.昨收=close.text
-            logger.info(f"{self.code}昨收:{close.text}")
-        else:
-            logger.warning(f"[警告] {self.code} 找不到昨收")
+        li_elements = soup.select("li.price-detail-item")
+        for li in li_elements:
+            print(li.text)
+            # 如果 li 元素的文本包含 "昨收"
+            if "昨收" in li.text:
+                # 找出第二個 span（即數值）
+                spans = li.find_all("span")
+                if len(spans) >= 2:
+                    yesterday_close = spans[1].text.strip()
+                    self.昨收=yesterday_close
+                    logger.info(f"{self.code}昨收:{yesterday_close}")
+
         
         
                 
