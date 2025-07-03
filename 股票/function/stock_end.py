@@ -30,6 +30,7 @@ class End:
         self.row=row
         self._is_etf_flag = is_etf_flag  # ★ 儲存外部傳入的布林值 (True/False/None)
         self.current_code=""
+        # 初始化所有屬性
         self.昨收 = "-"
         self.市盈率 = "-"
         self.市淨率 = "-"
@@ -55,15 +56,28 @@ class End:
         self.盈餘再投資比 = "-"
         self.現金流="-"
         self.管理費 = "-"
+        # 收集訊息用
+        self._buf: list[str] = []
+        self._buf_lock = threading.Lock()
             
-    
-        
+    #info 訊息功能
+    def _log(self, msg: str) -> None:
+        """把訊息暫存到本股票的 buffer；採用 f-string。"""
+        with self._buf_lock:
+            self._buf.append(msg)
+
+    def _flush_log(self) -> None:
+        """將本股票暫存訊息一次寫出並清空。"""
+        with self._buf_lock:
+            if self._buf:
+                joined = "\n  ".join(self._buf)  # 每行縮排 2 空格更清晰
+                logger.info(f"[{self.code}] \n  {joined}")
+                self._buf.clear()
 
     #資料
     def yesterday_close(self,soup:BeautifulSoup) -> None:
         li_elements = soup.select("li.price-detail-item")
         for li in li_elements:
-            print(li.text)
             # 如果 li 元素的文本包含 "昨收"
             if "昨收" in li.text:
                 # 找出第二個 span（即數值）
@@ -71,19 +85,17 @@ class End:
                 if len(spans) >= 2:
                     yesterday_close = spans[1].text.strip()
                     self.昨收=yesterday_close
-                    logger.info(f"{self.code}昨收:{yesterday_close}")
+                    self._log(f"{self.code} 昨收:{yesterday_close}")
 
-        
-        
                 
     #管理費
     def ManagementFee(self,soup:BeautifulSoup) -> None:
         elements =soup.find("div",class_="Py(8px) Pstart(12px) Bxz(bb) etf-management-fee")
         if elements:
             self.管理費=elements.text
-            logger.info(f"{self.code}管理費:{elements.text}")
+            self._log(f"{self.code}管理費:{elements.text}")
         else:
-            logger.warning(f"[警告] {self.code} 找不到管理費")
+            self._log(f"[警告] {self.code} 找不到管理費")
 
     def 股息發放日_ETF(self,soup: BeautifulSoup) -> None:
         elements =soup.find_all("div",class_="table-grid Mb(20px) row-fit-half")
@@ -93,7 +105,7 @@ class End:
             return
         desired_elements=second_element.find_all("div",class_="Py(8px) Pstart(12px) Bxz(bb)")
         self.股息發放日=desired_elements[-1].text
-        logger.info(f'{self.code} 股息發放日:{desired_elements[-1].text}')
+        self._log(f'{self.code} 股息發放日:{desired_elements[-1].text}')
     
         
     #-------------------------------------------------------------------------------------------
@@ -104,7 +116,7 @@ class End:
             return
         find= second_element.find_all("div",class_="Py(8px) Pstart(12px) Bxz(bb)")
         self.股息發放日=find[-1].text
-        logger.info(f"{self.code} 股息發放日:{find[-1].text}")
+        self._log(f"{self.code} 股息發放日:{find[-1].text}")
         
 
     #市盈率(PE)
@@ -122,7 +134,7 @@ class End:
         # 将市盈率赋值给self.市盈率
         self.市盈率=span_elements.text
         # 打印市盈率
-        logger.info(f"{self.code} 市盈率:{span_elements.text}")
+        self._log(f"{self.code} 市盈率:{span_elements.text}")
         
 
     #市淨率
@@ -140,7 +152,7 @@ class End:
         # 将市净率赋值给self.市淨率
         self.市淨率=span_elements.text
         # 打印市净率
-        logger.info(f" {self.code} 市淨率:{span_elements.text}")
+        self._log(f"{self.code} 市淨率:{span_elements.text}")
         
 
     def 財務報表(self):
@@ -161,38 +173,38 @@ class End:
         if elements[2].text!="":
             self.除權日=elements[2].text
         #打印除權日
-        logger.info(f' {self.code} 除權日:{elements[2].text}')
+        self._log(f'{self.code} 除權日:{elements[2].text}')
 
         #除息日
         #将除息日的年月日拼接起来，赋值给self.除息日
         self.除息日=f'{elements[1].text}/{elements[3].text}'
         #打印除息日
-        logger.info(f'{self.code} 除息日:{elements[1].text}/{elements[3].text}')
+        self._log(f'{self.code} 除息日:{elements[1].text}/{elements[3].text}')
 
         #股票股利
         #将股票股利赋值给self.股票股利
         self.股票股利=elements[5].text
         #打印股票股利
-        logger.info(f'{self.code} 股票股利:{elements[5].text}')
+        self._log(f'{self.code} 股票股利:{elements[5].text}')
 
         #現金股利
         #将現金股利赋值给self.現金股利
         self.現金股利=elements[6].text
         #打印現金股利
-        logger.info(f'{self.code} 現金股利:{elements[6].text}')
+        self._log(f'{self.code} 現金股利:{elements[6].text}')
 
         #EPS(盈餘)
         #将EPS(盈餘)赋值给self.盈餘
         self.盈餘=elements[7].text
         #打印EPS(盈餘)
-        logger.info(f'{self.code} EPS:{elements[7].text}')
+        self._log(f'{self.code} EPS:{elements[7].text}')
 
         #現金殖利率(殖利率)
         #如果現金殖利率不为空，则赋值给self.殖利率
         if elements[9].text!="":
             self.殖利率=elements[9].text
         #打印現金殖利率(殖利率)
-        logger.info(f'{self.code} 現金殖利率:{elements[9].text}')
+        self._log(f'{self.code} 現金殖利率:{elements[9].text}')
         
 
     def 杜邦分析(self):
@@ -208,10 +220,10 @@ class End:
             return 
         #ROE
         self.ROE=elements[1].text
-        logger.info(f"{self.code} ROE:{elements[1].text}")
+        self._log(f"{self.code} ROE:{elements[1].text}")
         #ROA
         self.資產報酬率=elements[2].text
-        logger.info(f"{self.code} 資產報酬率:{elements[2].text}")
+        self._log(f"{self.code} 資產報酬率:{elements[2].text}")
         
 
     #每股淨值
@@ -224,7 +236,7 @@ class End:
             return
 
         self.每股淨值=second_element[-1].text
-        logger.info(f"{self.code} 每股淨值:{second_element[-1].text}")
+        self._log(f"{self.code} 每股淨值:{second_element[-1].text}")
         
         
 
@@ -239,13 +251,13 @@ class End:
 
         #毛利率
         self.毛利率=elements[1].text
-        logger.info(f"{self.code} 毛利率:{elements[1].text}")
+        self._log(f"{self.code} 毛利率:{elements[1].text}")
         #營益率
         self.營益率=elements[2].text
-        logger.info(f"{self.code} 營益率:{elements[2].text}")
+        self._log(f"{self.code} 營益率:{elements[2].text}")
         #稅後淨利率
         self.稅後淨利率=elements[4].text
-        logger.info(f"{self.code} 淨利率:{elements[4].text}")
+        self._log(f"{self.code} 淨利率:{elements[4].text}")
         
 
     def 流速動比率(self):
@@ -257,10 +269,10 @@ class End:
             return
         #流動比
         self.流動比率=elements[1].text
-        logger.info(f"{self.code} 流動比:{elements[1].text}")
+        self._log(f"{self.code} 流動比:{elements[1].text}")
         #速動比
         self.速動比率=elements[2].text
-        logger.info(f"{self.code} {self.code} 速動比:{elements[2].text}")
+        self._log(f"{self.code} 速動比:{elements[2].text}")
         
 
     def 負債比(self):
@@ -270,7 +282,7 @@ class End:
         elements = soup.find_all("td")
         #負債比
         self.負債比率=elements[1].text
-        logger.info(f"{self.code} {self.code} 負債比:{elements[1].text}")
+        self._log(f"{self.code} 負債比:{elements[1].text}")
         
 
     def get_利息保障倍數(self):
@@ -282,7 +294,7 @@ class End:
             return "-"
         #利息保障倍數
         self.利息保障倍數=elements[1].text
-        logger.info(f"{self.code} 利息保障倍數:{elements[1].text}")
+        self._log(f"{self.code} 利息保障倍數:{elements[1].text}")
         
 
     def 營運週轉天數(self):
@@ -294,10 +306,10 @@ class End:
             return 
         #應收帳款收現天數
         self.應收帳款收現天數=elements[1].text
-        logger.info(f"{self.code} 應收帳款收現天數:{elements[1].text}")
+        self._log(f"{self.code} 應收帳款收現天數:{elements[1].text}")
         #存貨週轉天數
         self.存貨週轉天數=elements[2].text
-        logger.info(f"{self.code} 存貨週轉天數:{elements[2].text}")
+        self._log(f"{self.code} 存貨週轉天數:{elements[2].text}")
         
 
     def get_盈餘再投資比(self):
@@ -309,7 +321,7 @@ class End:
             return
         #盈餘再投資比
         self.盈餘再投資比=elements[1].text
-        logger.info(f"{self.code} 盈餘再投資比:{elements[1].text}")
+        self._log(f"{self.code} 盈餘再投資比:{elements[1].text}")
 
     def get_現金流(self):
         url = f"https://tw.stock.yahoo.com/quote/{self.code}/cash-flow-statement"
@@ -323,7 +335,7 @@ class End:
         elements=li.find_all("span")
         self.現金流=elements[1].text
         #現金流
-        logger.info(f"{self.code} 現金流:{elements[1].text}")
+        self._log(f"{self.code} 現金流:{elements[1].text}")
 
     def _is_etf(self,symbol: str) -> bool:
         """利用 Yahoo Finance Search API 判斷代碼是否為 ETF。
@@ -347,6 +359,8 @@ class End:
             logger.warning(f"[WARN] is_etf({symbol}) API error: {exc}")
         return False
 
+    
+
 
     #判斷
     def judge(self):
@@ -357,7 +371,7 @@ class End:
         profile_soup = fetch_html(profile_url)
         #获取股票代码
         self.current_code = yahoo_soup.find_all("title")
-        logger.info(f"\n {self.current_code}")
+        #logger.info(f"\n {self.current_code}")
 
 
         #判斷是否為ETF
@@ -381,6 +395,7 @@ class End:
             thread.start()
         for thread in threads:
             thread.join()
+        self._flush_log()     
 
 
     def _handle_stock(self, profile_soup: BeautifulSoup, yahoo_soup: BeautifulSoup):
@@ -403,7 +418,7 @@ class End:
             thread.start()
         for thread in threads:
             thread.join()
-
+        self._flush_log() 
 
         #---------------------------------------
         
@@ -489,7 +504,7 @@ def update_data_parallel(session: ExcelSession,
             row, data = future.result()          # 取 (row, list)
             addr = f"P{row}:AN{row}"
             session.range(addr).value = data
-            logger.info(f"[INFO] {futures[future][0]} 寫入完成 (row {row})")
+            logger.info(f"{futures[future][0]} 寫入完成 (row {row})")
 
     session.autofit()
     session.save()
