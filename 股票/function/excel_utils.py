@@ -6,14 +6,24 @@ class ExcelSession:
     """
     封裝 xlwings 的工作簿 / 工作表，
     - 進入 with：開檔
-    - 離開 with：自動 save + close
+    - auto_close=True  → 離開 with 時 save + close
+    - auto_close=False → 只 save，不關閉，保留 Excel 供後續檢視
     """
 
     def __init__(self,
                 file: str,
                 sheet_name: str | None = None,
-                visible: bool = True):
+                visible: bool = True,
+                auto_close: bool = True) -> None:
+        
+        if visible == False and auto_close == False: 
+            self._auto_close = True  # 若不可見，則強制 auto_close=True
+            print("[WARN] Excel 在背景開啟且未自動關閉，檔案將被鎖定")
+        else:
+            self._auto_close = auto_close
+
         self._app: xw.App | None = None
+
         try:
             self.wb = xw.Book(file)
         except Exception:
@@ -43,4 +53,5 @@ class ExcelSession:
     def __enter__(self): return self
     def __exit__(self, exc_type, exc, tb):
         self.save()
-        self.close()
+        if self._auto_close:           # ★ 只在需要時才 close
+            self.close()
