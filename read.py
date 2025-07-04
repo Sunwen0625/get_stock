@@ -77,7 +77,7 @@ def run() -> None:
     with ExcelSession(cfg["write_file"], cfg["write_sheet"]) as xls_hist:
         try:
             logger.info("更新歷史資料 …")
-            stock_end.update_data(xls_hist, cfg["code"])
+            stock_end.update_data_parallel(xls_hist, cfg["code"])
         except Exception as exc:  # pylint: disable=broad-except
             raise FatalError("更新歷史資料失敗") from exc
 
@@ -88,6 +88,7 @@ def run() -> None:
         codes=symbols,
         xls_path=cfg["write_file"],
         sheet_name=cfg["write_sheet"],
+        auto_close=cfg["excel_auto_close"]
     ).run()
     
 

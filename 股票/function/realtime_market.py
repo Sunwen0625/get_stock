@@ -22,6 +22,7 @@ class RealtimeMarket:
         codes: List[str],
         xls_path: str | Path,
         sheet_name: str,
+        auto_close: bool =True,  
         *,
         closing: dtime = CLOSING_TIME,
         poll_sec: int = POLL_SEC,
@@ -29,6 +30,7 @@ class RealtimeMarket:
         self.codes = codes
         self.xls_path = xls_path
         self.sheet_name = sheet_name
+        self.auto_close = auto_close
         self.closing = closing
         self.poll_sec = poll_sec
 
@@ -36,7 +38,7 @@ class RealtimeMarket:
     def run(self) -> None:
         # —— 型別斷言：把 Path 強制視為 str —— #
         xls_path_str: str = cast(str, self.xls_path)
-        with ExcelSession(xls_path_str, self.sheet_name) as xls:
+        with ExcelSession(xls_path_str, self.sheet_name,auto_close=self.auto_close) as xls:
             #logger.info("♦ 盤中輪詢開始")
             #self._poll_until_close(xls)
 

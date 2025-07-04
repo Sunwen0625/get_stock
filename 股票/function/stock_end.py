@@ -7,8 +7,8 @@ import time
 import logging
 
 
-from excel_utils import ExcelSession 
-from settings_loader import load_codes
+from .excel_utils import ExcelSession 
+from .settings_loader import load_codes
 
 logging.basicConfig(
     level=logging.INFO,
