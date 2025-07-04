@@ -9,6 +9,7 @@
   "save": false,
   "check_wait": false,
   "ending_wait": false,
+  "excel_auto_close": false,
   "code": {
   }
 }
