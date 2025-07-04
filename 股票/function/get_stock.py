@@ -139,14 +139,14 @@ class RealtimeStockData:
 
         data = [
             self.name(),
-            self._rt()["best_bid_price"][-1],
-            self._rt()["best_ask_price"][-1],
+            self._rt()["best_bid_price"][0],
+            self._rt()["best_ask_price"][0],
             self._latest_trade_price(sheet),
             self._amplitude(sheet),
             self._amplitude_pct(sheet),
             self._trade_volume(sheet),
-            self._rt()["best_bid_volume"][-1],
-            self._rt()["best_ask_volume"][-1],
+            self._rt()["best_bid_volume"][0],
+            self._rt()["best_ask_volume"][0],
             self._rt()["accumulate_trade_volume"],
             self._rt()["high"],
             self._rt()["low"],
