@@ -1,3 +1,2 @@
-/getstock
-*.pyc
-/test
+__pycache__
+*.txt
