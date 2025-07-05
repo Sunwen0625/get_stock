@@ -6,8 +6,9 @@ from typing import List,cast
 from pathlib import Path
 
 from .excel_utils import ExcelSession
-from .get_stock import RealtimeStockData   # 你的檔名可自行調整
+from .get_stock import RealtimeStockData   
 from . import classification
+from .rename_code_only_sheets import rename_code_only_sheets
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,8 @@ class RealtimeMarket:
         codes: List[str],
         xls_path: str | Path,
         sheet_name: str,
-        auto_close: bool =True,  
+        auto_close: bool =True, 
+        have_changed: bool = False, 
         *,
         closing: dtime = CLOSING_TIME,
         poll_sec: int = POLL_SEC,
@@ -31,6 +33,7 @@ class RealtimeMarket:
         self.xls_path = xls_path
         self.sheet_name = sheet_name
         self.auto_close = auto_close
+        self.have_changed = have_changed
         self.closing = closing
         self.poll_sec = poll_sec
 
@@ -44,10 +47,16 @@ class RealtimeMarket:
 
             logger.info("♦ 收盤最後一次更新")
             RealtimeStockData.update_realtime_data(self.codes, xls)   # re-use 函式
+            
+            if self.have_changed:
+                logger.info("♦ 更新工作頁名稱")
+                rename_code_only_sheets(xls)
 
             logger.info("♦ 分類開始")
             classification.classification(self.codes, xls)
             logger.info("♦ 分類結束")
+
+            xls.save()  # 保存工作簿
 
     """ 
     # -------- 私有方法 -------- #

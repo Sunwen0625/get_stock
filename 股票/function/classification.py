@@ -23,15 +23,7 @@ def classification(codes: list[str], session: ExcelSession) -> None:
             src_sheet.range(f"A{row_idx}:P{row_idx}").api.Copy(dst.range("A5").api)
             dst.autofit()    # 自動欄寬/高
         
-    # 保存并关闭工作簿
-    session.save() 
 
-
-if __name__ == '__main__':
-    target_elements = ['0050', '0052', '0056', '006208', '00679B', '00687B', '00690', '00692', '00701', '00713', '00728', '00731', '00751B', '00773B', '00850', '00878', '00881', '00888', '1232', '2308', '2317', '2480', '2912', '3711', '8926']
-
-    with ExcelSession("99.xlsx","new title" ) as xls:
-        classification(target_elements,xls)
     
     
     

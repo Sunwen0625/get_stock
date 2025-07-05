@@ -20,6 +20,7 @@ from 股票.function import (
 )
 from 股票.function.realtime_market import RealtimeMarket
 from 股票.function.excel_utils import ExcelSession
+from 股票.function.stock_add_sheet import ensure_code_sheets
 
 # ──────────────────────────────
 # 1. 設定與常數
@@ -72,9 +73,16 @@ def run() -> None:
         logger.info("symbols 與設定檔不一致，執行 stock_cache.update_code_section()")
         stock_cache.update_code_section(symbols)
         cfg = load_config()  # 熱重載
-
+        have_changed = True
+    else:
+        have_changed = False
+        print("symbols 與設定檔一致，無需更新")
+    
     # 1. 歷史資料
     with ExcelSession(cfg["write_file"], cfg["write_sheet"]) as xls_hist:
+        if have_changed:
+            ensure_code_sheets(xls_hist,symbols )
+
         try:
             logger.info("更新歷史資料 …")
             stock_end.update_data_parallel(xls_hist, cfg["code"])
@@ -88,7 +96,8 @@ def run() -> None:
         codes=symbols,
         xls_path=cfg["write_file"],
         sheet_name=cfg["write_sheet"],
-        auto_close=cfg["excel_auto_close"]
+        auto_close=cfg["excel_auto_close"],
+        have_changed=have_changed,
     ).run()
     
 
