@@ -8,6 +8,9 @@ set SETTING_FILE=setting.json
 echo 🔐 正在暫存你的個人化設定：%SETTING_FILE%
 git stash push -u -m "backup personal setting" %SETTING_FILE%
 
+::--- 2) 丟掉其餘改動 -------------------------------
+git reset --hard               
+git clean -fd                  
 
 echo ⬇️ 正在從遠端拉取變更...
 git pull --rebase
