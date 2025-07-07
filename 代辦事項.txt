@@ -1,7 +1,0 @@
-製作setting 做成gui介面
-stock_end 做個顯眼的指標
-重構程式碼
-classification 多線程
-錯誤排除函數 {讓所有地方出現錯誤時,有相同的解決辦法,同時顯示錯誤原因,cmd會停留}
-新增股票會創建新的工作頁
-使用import pickle 紀錄前一次的設置
