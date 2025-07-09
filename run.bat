@@ -23,4 +23,4 @@ REM 執行 read.py（會在 poetry 虛擬環境中執行）
 echo ▶️ 執行 Python 程式 read.py...
 poetry run python read.py
 
-pause
+
