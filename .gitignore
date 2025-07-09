@@ -3,3 +3,4 @@ __pycache__
 setting.json
 excel備份
 *.xlsx
+!default.xlsx

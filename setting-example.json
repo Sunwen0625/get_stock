@@ -1,0 +1,20 @@
+{
+  "read_excel": {
+    "file": "default.xlsx",
+    "sheet": "工作表1"
+  },
+  "write_excel": {
+    "file": "default.xlsx",
+    "sheet": "工作表1"
+  },
+  "wait": {
+    "ending_wait": false
+  },
+  "excel_config": {
+    "save": false,
+    "backup_path": "./excel備份",
+    "backup_filename_format": "{filename}_backup_{timestamp}.xlsx",
+    "excel_auto_close": false
+  },
+  "stock_code": {}
+}

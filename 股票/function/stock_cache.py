@@ -29,7 +29,7 @@ def load_setting():
 def save_setting(setting: dict):
     """寫回 setting.json（只動 code 區塊，其餘設定原樣保留）"""
     with open(SETTING_FILE, "w", encoding="utf-8") as f:
-        json.dump(setting, f, ensure_ascii=False, indent=2)
+        json.dump(setting, f, ensure_ascii=False, indent=4)
 
 def update_code_section(symbols: list[str]):
     """只更新 setting.json 裡的 code 欄位"""
@@ -37,7 +37,7 @@ def update_code_section(symbols: list[str]):
     twstock.__update_codes()
     setting = load_setting()
     # 若沒有 code 欄位則新增一個空 dict
-    code_cache = setting.get("code", {})
+    code_cache = setting.get("stock_code", {})
 
     # 產生新 code 快取，只保留當前 symbols 清單
     new_code = {}
@@ -51,7 +51,7 @@ def update_code_section(symbols: list[str]):
         new_code[symbol] = result
 
     # 移除快取裡多餘的股票
-    setting["code"] = new_code
+    setting["stock_code"] = new_code
 
     # 其他欄位完全不變
     save_setting(setting)
