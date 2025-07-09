@@ -66,10 +66,26 @@ class FatalError(Exception):
 
 def run() -> None:
     cfg = load_config()
-    symbols = read_symbols(cfg["read_file"], cfg["read_sheet"])
+
+    read_excel = cfg["read_excel"]
+    write_excel = cfg["write_excel"]
+    wait = cfg["wait"]
+    excel_config = cfg["excel_config"]
+
+    #執行前先備份excel檔案
+    if excel_config.get("save"):
+        from 股票.function.backup_excel import backup_excel
+
+        backup_excel(
+            read_excel["file"],
+            excel_config["backup_path"],
+            excel_config["backup_filename_format"]
+            )
+
+    symbols = read_symbols(read_excel["file"], read_excel["sheet"])
 
     # 若 symbols 不在設定檔 code 區塊，嘗試更新後重新載入
-    if not symbols_match_config(symbols, cfg["code"]):
+    if not symbols_match_config(symbols, cfg["stock_code"]):
         logger.info("symbols 與設定檔不一致，執行 stock_cache.update_code_section()")
         stock_cache.update_code_section(symbols)
         cfg = load_config()  # 熱重載
@@ -79,13 +95,13 @@ def run() -> None:
         print("symbols 與設定檔一致，無需更新")
     
     # 1. 歷史資料
-    with ExcelSession(cfg["write_file"], cfg["write_sheet"]) as xls_hist:
+    with ExcelSession(write_excel["file"], write_excel["sheet"]) as xls_hist:
         if have_changed:
             ensure_code_sheets(xls_hist,symbols )
 
         try:
             logger.info("更新歷史資料 …")
-            stock_end.update_data_parallel(xls_hist, cfg["code"])
+            stock_end.update_data_parallel(xls_hist, cfg["stock_code"])
         except Exception as exc:  # pylint: disable=broad-except
             raise FatalError("更新歷史資料失敗") from exc
 
@@ -94,18 +110,16 @@ def run() -> None:
     # 2. 收盤後最後一次拉即時 & 分類
     RealtimeMarket(
         codes=symbols,
-        xls_path=cfg["write_file"],
-        sheet_name=cfg["write_sheet"],
-        auto_close=cfg["excel_auto_close"],
+        xls_path=write_excel["file"],
+        sheet_name=write_excel["sheet"],
+        auto_close=excel_config["excel_auto_close"],
         have_changed=have_changed,
     ).run()
     
 
-    if cfg.get("save"):
-        import 股票.save_as as save_as  # 避免循環匯入
-        save_as.save_as(cfg["read_file"])
+    
 
-    if cfg.get("ending_wait"):
+    if wait.get("ending_wait"):
         input("流程完畢，按任意鍵結束…")
 
 
