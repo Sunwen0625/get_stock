@@ -108,8 +108,7 @@ class ExcelSession:
         if name and name in [s.name for s in self.wb.sheets]:
             match if_exists:
                 case "return":
-                    target_sh = self.wb.sheets[name]
-                    return target_sh
+                    return self.wb.sheets[name]
                 case "error":
                     raise ValueError(f"Worksheet '{name}' already exists.")
                 case "rename":
@@ -120,12 +119,42 @@ class ExcelSession:
                     name = f"{base} ({i})"
 
         # --- 2. 位置決定 ---
-        if position == "end":
-            target_sh = self.wb.sheets.add(name, after=self.wb.sheets[-1])
-        else:
-            ref_sh = self.wb.sheets[reference] if reference is not None else self.sh
-            target_sh = self.wb.sheets.add(name, before=ref_sh if position == "before" else None,
-                                                after=ref_sh if position == "after"  else None)
+        sheets = self.wb.sheets
+        # 找出最後一個「可見」的工作表
+        visible_sheets = [s for s in sheets if s.api.Visible == -1] 
+        try:
+            if position == "end":
+                if len(visible_sheets) == 0:
+                    target_sh = sheets.add(name)
+                else:
+                    target_sh = sheets.add(name, after=visible_sheets[-1])
+            else:
+                # reference 必須合法
+                if reference is None:
+                    ref_sh = getattr(self, 'sh', sheets[0] if len(sheets) > 0 else None)
+                elif isinstance(reference, int):
+                    # 檢查 index 是否超界
+                    if reference < 0 or reference >= len(sheets):
+                        raise IndexError(f"reference 索引超出範圍: {reference}")
+                    ref_sh = sheets[reference]
+                elif isinstance(reference, str):
+                    if reference not in [s.name for s in sheets]:
+                        raise ValueError(f"找不到名稱為 {reference} 的工作表")
+                    ref_sh = sheets[reference]
+                else:
+                    raise ValueError("reference 必須為 str 或 int 或 None")
+
+                if position == "before":
+                    target_sh = sheets.add(name, before=ref_sh)
+                elif position == "after":
+                    target_sh = sheets.add(name, after=ref_sh)
+                else:
+                    raise ValueError(f"未知的位置參數: {position}")
+        except Exception as e:
+            print(f"[ERROR] add_sheet 發生例外: {e}")
+            print(f"  sheets: {[s.name for s in sheets]}")
+            print(f"  visible: {[s.name for s in visible_sheets]}")
+            raise
             
         if activate:
             target_sh.activate()
