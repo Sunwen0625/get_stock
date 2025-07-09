@@ -1,7 +1,7 @@
 import twstock
 import time
 import logging
-from datetime import datetime
+from datetime import date
 from typing import List
 
 
@@ -52,7 +52,7 @@ class RealtimeStockData:
     # ========== 2. 產生空白 payload ==========
     @staticmethod
     def _make_blank_payload(code: str) -> dict:
-        today = datetime.date.today().isoformat()
+        today = date.today().isoformat()
         return {
             "success": False,
             "info":  {"code": code, "name": _BLANK, "time": f"{today} 00:00:00"},
@@ -80,6 +80,10 @@ class RealtimeStockData:
             row += 1
 
         return failed
+    
+    @staticmethod
+    def blank_or_value(blank, value, fallback="-"):
+        return fallback if blank or value == "-" else value
 
     """單檔個股即時資料處理。"""
     def __init__(self, code_data:dict , row:int,*, blank: bool = False) -> None:
@@ -107,10 +111,8 @@ class RealtimeStockData:
     # ---------- 即時欄位 ---------- #
     
     #成交價
-    #if get_realtime()["latest_trade_price"] != "-" -> 正常資料 else ->儲存格資料
     def _latest_trade_price(self, sheet):
-        price = self._rt()["latest_trade_price"]
-        return price if price != "-" else sheet.range(f"F{self.row}").value
+        return self.blank_or_value(self.blank, self._rt()["latest_trade_price"])
     
     #昨收
     def _close_price(self, sheet):
@@ -118,17 +120,32 @@ class RealtimeStockData:
     
     #漲跌
     def _amplitude(self, sheet):
-        return float(self._latest_trade_price(sheet)) - float(self._close_price(sheet))
+        latest = self._latest_trade_price(sheet)
+        close = self._close_price(sheet)
+        try:
+            latest_f = float(latest)
+            close_f = float(close)
+            return round(latest_f - close_f, 2)
+        except (TypeError, ValueError):
+            return "-"
     
     # 漲跌%
     def _amplitude_pct(self, sheet):
-        pct = self._amplitude(sheet) / float(self._close_price(sheet)) * 100
-        return round(pct, 2)
+        amplitude = self._amplitude(sheet)
+        close = self._close_price(sheet)
+        try:
+            amplitude_f = float(amplitude)
+            close_f = float(close)
+            if close_f == 0:
+                return "-"
+            return round(amplitude_f / close_f * 100, 2)
+        except (TypeError, ValueError):
+            return "-"
     
     #成交量
     def _trade_volume(self, sheet):
-        vol = self._rt()["trade_volume"]
-        return vol if vol != "-" else sheet.range(f"I{self.row}").value
+        return self.blank_or_value(self.blank, self._rt()["trade_volume"])
+
         
     # ---------- Excel 操作 ---------- #
 
