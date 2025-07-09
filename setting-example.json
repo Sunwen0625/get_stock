@@ -14,7 +14,8 @@
     "save": false,
     "backup_path": "./excel備份",
     "backup_filename_format": "{filename}_backup_{timestamp}.xlsx",
-    "excel_auto_close": false
+    "excel_auto_close": false,
+    "auto_add_sheet": false
   },
   "stock_code": {}
 }
