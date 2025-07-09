@@ -1,8 +1,10 @@
 import json
+import re
 import requests
 import twstock
 
 SETTING_FILE = "setting.json"
+_CODE_PREFIX_RE = re.compile(r"^(\d{1,5})([A-Za-z]*)$")  # 支援補齊成4~6碼股票代碼
 
 def is_etf(symbol: str) -> bool | None:
     """利用 Yahoo Finance Search API 判斷代碼是否為 ETF。"""
@@ -20,6 +22,14 @@ def is_etf(symbol: str) -> bool | None:
         print(f"[WARN] is_etf({symbol}) API error: {exc}")
         return 
     return False
+
+def normalize_symbol(code: str) -> str:
+    """補齊股票代碼前綴 0，例如 '50' → '0050'"""
+    match = _CODE_PREFIX_RE.match(code)
+    if match:
+        num, suffix = match.groups()
+        return num.zfill(4) + suffix.upper()
+    return code
 
 def load_setting():
     """讀取 setting.json"""
@@ -42,13 +52,14 @@ def update_code_section(symbols: list[str]):
     # 產生新 code 快取，只保留當前 symbols 清單
     new_code = {}
     for symbol in symbols:
-        if symbol in code_cache:
-            result = code_cache[symbol]
-            print(f"{symbol} is ETF (cached): {result}")
+        norm_symbol = normalize_symbol(symbol)
+        if norm_symbol in code_cache:
+            result = code_cache[norm_symbol]
+            print(f"{norm_symbol} is ETF (cached): {result}")
         else:
-            result = is_etf(symbol)
-            print(f"{symbol} is ETF (fetched): {result}")
-        new_code[symbol] = result
+            result = is_etf(norm_symbol)
+            print(f"{norm_symbol} is ETF (fetched): {result}")
+        new_code[norm_symbol] = result
 
     # 移除快取裡多餘的股票
     setting["stock_code"] = new_code
