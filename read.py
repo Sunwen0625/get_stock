@@ -45,7 +45,7 @@ def load_config(path: Path = CONFIG_PATH) -> Dict:
 
 
 def read_symbols(file: str, sheet: str) -> List[str]:
-    df = pd.read_excel(file, sheet)
+    df = pd.read_excel(file, sheet,dtype="str")
     return df.iloc[:, 1].astype(str).tolist()
 
 
