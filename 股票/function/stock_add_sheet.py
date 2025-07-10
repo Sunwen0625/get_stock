@@ -27,24 +27,41 @@ def normalize_code(code: str) -> str:
 
 _CODE_PREFIX_RE = re.compile(r"^(\d{4,6})([A-Za-z]*)")      # 比對「工作表名稱開頭是一串 4~6 位的數字」
 
-def ensure_code_sheets(session: ExcelSession, codes: list[str]) -> None:
+def ensure_code_sheets(
+        session: ExcelSession, 
+        codes: list[str] ,
+        ) -> None:
     """
     確保一組 `codes` 都各自擁有對應的工作表，若缺少則立即建立。
 
+    此函式會檢查指定的股票代碼是否都有對應的工作表，對於缺少的代碼會自動建立新的工作表。
+    支援從列表或字典格式的代碼輸入，並可選擇是否依照位置排序。
+
     Parameters
     ----------
-    wb : xw.Book
-        已開啟的 xlwings 工作簿物件。
-    codes : Iterable[str]
-        目標股票代碼列表；可為 str 或 int，函式會自動轉成零填補的 4 位字串。
-    create_at_end : bool, default=True
-        - True  → 在活頁簿尾端插入新工作表（比較不干擾原本排序）。
-        - False → 在第一個工作表之前插入新工作表。
-    """
-    # ---- 1. 整理輸入代碼成固定 4 位以上的 zero-padded 字串 ----
-    normalized : set[str] = {normalize_code(c) for c in codes}
+    session : ExcelSession
+        Excel 會話物件，包含已開啟的工作簿和相關操作方法。
+    codes : list[str] 
+        目標股票代碼集合。
+        - 若為 list[str]：直接使用代碼列表
+    Returns
+    -------
+    None
+        此函式無回傳值，直接對工作簿進行修改。
 
-    # ---- 2. 找出活頁簿中「已經存在」且符合命名規則的股票代碼 ----
+    Notes
+    -----
+    - 代碼會透過 normalize_code() 函式進行正規化處理
+    - 新工作表一律建立在工作簿尾端，避免干擾現有排序
+    - 使用 if_exists="return" 避免重複建立已存在的工作表
+    - 新建立的工作表不會自動啟用（activate=False）
+
+    """
+
+    # 2. 正規化
+    normalized: set[str] = {normalize_code(c) for c in codes}
+
+    # 3. 取得現有工作表名
     existing = {
         normalize_code(m.group())
         for sht in session.wb.sheets
