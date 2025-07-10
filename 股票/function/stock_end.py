@@ -484,24 +484,26 @@ def fetch_one(code: str, row: int) -> tuple[int, list]:
     return row, data
 
 def update_data_parallel(session: ExcelSession,
-                        codes: list[str] | dict[str, bool],
+                        codes: list[str] | dict[str, dict],
+                        row_map: dict[str, int],
                         max_workers: int = 6):
+    # 1. 取得 codes 名單
     if isinstance(codes, dict):
-        iterable = codes.items()
+        code_list = list(codes.keys())
     else:
-        iterable = ((c, None) for c in codes)
+        code_list = codes
     
-    # 2) 建立 ThreadPoolExecutor
+    # 2) 建立 ThreadPoolExecutor，提交所有任務
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         # 對每支股票提交任務
         futures = {
-            pool.submit(fetch_one, code, idx + 2):  (code, idx + 2)
-            for idx, (code, _) in enumerate(iterable)
+            pool.submit(fetch_one, code, row_map[code]): (code, row_map[code])
+            for code in code_list
         }
 
         # 3) 依完成順序寫入 Excel
         for future in as_completed(futures):
-            row, data = future.result()          # 取 (row, list)
+            row, data = future.result()          # fetch_one 回傳 (row, data)
             addr = f"P{row}:AN{row}"
             session.range(addr).value = data
             logger.info(f"{futures[future][0]} 寫入完成 (row {row})")
@@ -511,8 +513,10 @@ def update_data_parallel(session: ExcelSession,
 
 
 
-
+""" 
 if __name__ == '__main__':
     
     with ExcelSession("data.xlsx", "new title") as xls:  # ← 只要這一行
-        update_data_parallel(xls,["1232", "2105", "2308","2317"])
+       # update_data_parallel(xls,["1232", "2105", "2308","2317"])
+       pass
+"""
