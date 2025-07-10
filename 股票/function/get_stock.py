@@ -28,26 +28,35 @@ class RealtimeStockData:
     """單檔個股即時資料處理 (Null-Object Pattern)."""
     # ========== 1. 建立物件：正常 or 空白 ==========
     @classmethod
-    def from_code(cls, code: str, row: int):
+    def from_code(cls, code: str, row: int, retry: int = 3, retry_interval: float = 5.0):
         """
         抓即時資料並回傳 RealtimeStockData 物件。
-        無論成功與否都回傳物件；失敗時 data 會是「全欄位 _BLANK」，屬性 blank=True。
+        失敗時最多重試 retry 次，每次間隔 retry_interval 秒。
+        失敗時 data 會是「全欄位 _BLANK」，屬性 blank=True。
         """
-        try:
-            data = twstock.realtime.get(code)
-            if not data.get("success"):            # API 回傳 success=False
-                raise ValueError("success=False")  # 統一丟進 except 區
-
-        except Exception as err:                   # 含 KeyError('tlong')、timeout…
-            print(f"{code}: {err} → 以空白資料填入")
-            data = cls._make_blank_payload(code)   # 產生全是 "-"
-            blank = True
-        else:
-            blank = False
-
+        last_err = None
+        for attempt in range(1, retry + 1):
+            try:
+                data = twstock.realtime.get(code)
+                if not data.get("success"):
+                    raise ValueError("success=False")  # API 回傳 success=False
+                obj = cls(data, row)
+                obj.blank = False
+                return obj
+            except Exception as err: # 含 KeyError('tlong')、timeout…
+                last_err = err
+                logger.warning(f"{code}: 第{attempt}次抓取失敗（{err}）")
+                if attempt < retry:
+                    time.sleep(retry_interval)
+        
+        logger.error(f"{code}: 重試{retry}次皆失敗，將以空白填入（最後錯誤：{last_err}）")
+        # 最後都失敗才回傳空白資料
+        logger.error(f"{code}: 重試{retry}次皆失敗，將以空白填入")
+        data = cls._make_blank_payload(code) # 產生全是 "-"
         obj = cls(data, row)
-        obj.blank = blank                          # 標註是否為空白資料
+        obj.blank = True # 標註是否為空白資料
         return obj
+
 
     # ========== 2. 產生空白 payload ==========
     @staticmethod
@@ -60,29 +69,37 @@ class RealtimeStockData:
         }
     # ========= 盤中批次工具 ========= #
     @staticmethod
-    def update_realtime_data(codes: List[str], session: ExcelSession) -> List[str]:
+    def update_realtime_data(
+        codes: List[str],
+        session: ExcelSession,
+        row_map: dict[str, int] | None = None
+        ) -> List[str]:
         """
         盤中批次抓即時資料並寫入 Excel。
+        - codes: 股票代碼清單，順序與 row_map 對應。
+        - session: ExcelSession
+        - row_map: {代碼: 寫入行號}，若為 None 則自動用 enumerate(row=2)
         失敗的股票代碼會被收集後回傳，方便呼叫端做告警或重試。
         """
-        row = 2                     # Excel 從第 2 列開始寫
         failed: List[str] = []
 
-        for code in codes:
+        for idx, code in enumerate(codes):
+            if row_map is not None:
+                row = row_map[code] #dict 格式 裡面有code的話就回傳對應的row
+            else:
+                row = idx + 2  #list 格式 +2用來對應excel的位置 idx 從0開始 1是標題 所以+2
             try:
                 stock = RealtimeStockData.from_code(code, row)
                 stock.input_data(session.sh)
-                if stock.blank:     # API 失敗但已以「-」填入
+                if stock.blank:
                     failed.append(code)
             except Exception as exc:
-                logger.warning("處理 %s 發生錯誤：%s", code, exc,exc_info=True)
+                logger.warning("處理 %s 發生錯誤：%s", code, exc, exc_info=True)
                 failed.append(code)
-            row += 1
-
         return failed
     
     @staticmethod
-    def blank_or_value(blank, value, fallback="-"):
+    def _blank_or_value(blank, value, fallback="-"):
         return fallback if blank or value == "-" else value
 
     """單檔個股即時資料處理。"""
@@ -112,7 +129,7 @@ class RealtimeStockData:
     
     #成交價
     def _latest_trade_price(self, sheet):
-        return self.blank_or_value(self.blank, self._rt()["latest_trade_price"])
+        return self._blank_or_value(self.blank, self._rt()["latest_trade_price"])
     
     #昨收
     def _close_price(self, sheet):
@@ -144,7 +161,7 @@ class RealtimeStockData:
     
     #成交量
     def _trade_volume(self, sheet):
-        return self.blank_or_value(self.blank, self._rt()["trade_volume"])
+        return self._blank_or_value(self.blank, self._rt()["trade_volume"])
 
         
     # ---------- Excel 操作 ---------- #
@@ -176,15 +193,6 @@ class RealtimeStockData:
 
     
 # --------------------------------------------------
-""" 
-#盤中抓即時資料
-def update_realtime_data(codes: list[str], session:ExcelSession) -> None:
-    "盤中抓即時資料並寫入 Excel。"
-    row = 2
-    for code in codes:
-        RealtimeStockData.from_code(code, row).input_data(session.sh)
-        row += 1
-"""
 
 
 
@@ -193,6 +201,6 @@ if __name__ == "__main__":
 
     with ExcelSession("data.xlsx", sheet_name="new title") as xls:
         while True:
-            RealtimeStockData.update_realtime_data(CODES, xls)
+            #RealtimeStockData.update_realtime_data(CODES, xls)
             time.sleep(3)
     
