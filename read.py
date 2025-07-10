@@ -13,14 +13,9 @@ from typing import Dict, List
 import pandas as pd
 
 
-from 股票.function import (
-    stock_end,
-    stock_cache,
-    
-)
-from 股票.function.realtime_market import RealtimeMarket
-from 股票.function.excel_utils import ExcelSession
-from 股票.function.stock_add_sheet import ensure_code_sheets
+from 股票.function import stock_cache
+from 股票.function.StockDataProcessor import StockDataProcessor,FatalError
+
 
 # ──────────────────────────────
 # 1. 設定與常數
@@ -49,17 +44,43 @@ def read_symbols(file: str, sheet: str) -> List[str]:
     return df.iloc[:, 1].astype(str).tolist()
 
 
-def symbols_match_config(symbols: List[str], codes_cfg: Dict[str, bool]) -> bool:
-    """確認 symbols 均存在於 codes_cfg 的 key 內"""
-    return all(sym in codes_cfg for sym in symbols)
+def symbols_match_config(symbols: List[str], codes_cfg: dict) -> bool:
+    """
+    確認 symbols 的順序與 codes_cfg 完全一致。
+    
+    此函數檢查輸入的股票代碼列表是否與配置字典中的鍵完全匹配，
+    包括順序和內容都必須一致。
+    
+    Args:
+        symbols (List[str]): 需要檢查的股票代碼列表
+        codes_cfg (dict): 包含股票代碼配置的字典
+    
+    Returns:
+        bool:如果 symbols 的標準化結果與 codes_cfg 的鍵完全匹配則返回 True，否則返回 False
+    
+    Note:
+        - 會使用 stock_cache.normalize_symbol() 對輸入的股票代碼進行標準化處理
+        - 比較時要求順序和內容都完全一致
+    """
+
+    # 將 symbols 轉換為標準格式
+    normalized = [stock_cache.normalize_symbol(s) for s in symbols]
+    # 取得 codes_cfg 的鍵
+    cfg_keys = list(codes_cfg.keys())
+    """ 
+    #debug 用
+    print(f"symbols = {normalized}")
+    print(f"config  = {cfg_keys}")
+    """
+    # 必須完全一樣，且長度相同
+    return normalized == cfg_keys 
 
 
 def prompt_yes_no(msg: str) -> bool:
     return input(f"{msg} (y/n): ").strip().lower() == "y"
 
 
-class FatalError(Exception):
-    """可預期但致命的錯誤 — 直接結束程式。"""
+
 
 
 
@@ -94,30 +115,20 @@ def run() -> None:
         have_changed = False
         print("symbols 與設定檔一致，無需更新")
     
-    # 1. 歷史資料
-    with ExcelSession(write_excel["file"], write_excel["sheet"]) as xls_hist:
-        if have_changed:
-            ensure_code_sheets(xls_hist,symbols )
 
-        try:
-            logger.info("更新歷史資料 …")
-            stock_end.update_data_parallel(xls_hist, cfg["stock_code"])
-        except Exception as exc:  # pylint: disable=broad-except
-            raise FatalError("更新歷史資料失敗") from exc
+    try :
+        # 2. 收盤後最後一次拉即時 & 分類
+        StockDataProcessor(
+            codes=cfg["stock_code"],
+            xls_path=write_excel["file"],
+            sheet_name=write_excel["sheet"],
+            auto_close=excel_config["excel_auto_close"],
+            auto_add_sheet=excel_config["auto_add_sheet"],
+            have_changed=have_changed,
+        ).process_market_data()
+    except FatalError as exc:
+        raise FatalError("股票出現錯誤") from exc
 
-    
-
-    # 2. 收盤後最後一次拉即時 & 分類
-    RealtimeMarket(
-        codes=symbols,
-        xls_path=write_excel["file"],
-        sheet_name=write_excel["sheet"],
-        auto_close=excel_config["excel_auto_close"],
-        have_changed=have_changed,
-    ).run()
-    
-
-    
 
     if wait.get("ending_wait"):
         input("流程完畢，按任意鍵結束…")
