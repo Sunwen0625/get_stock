@@ -51,15 +51,20 @@ def update_code_section(symbols: list[str]):
 
     # 產生新 code 快取，只保留當前 symbols 清單
     new_code = {}
-    for symbol in symbols:
+    for idx, symbol in enumerate(symbols, start=1):   # 位置從 1 開始
         norm_symbol = normalize_symbol(symbol)
-        if norm_symbol in code_cache:
-            result = code_cache[norm_symbol]
-            print(f"{norm_symbol} is ETF (cached): {result}")
+        # 取得 ETF 狀態（舊有快取 or 查詢）
+        if isinstance(code_cache.get(norm_symbol), dict):
+            result = code_cache[norm_symbol].get("isETF")
         else:
+            result = code_cache.get(norm_symbol)
+            
+        if result is None:
             result = is_etf(norm_symbol)
             print(f"{norm_symbol} is ETF (fetched): {result}")
-        new_code[norm_symbol] = result
+        else:
+            print(f"{norm_symbol} is ETF (cached): {result}")
+        new_code[norm_symbol] = {"isETF": bool(result), "position": idx}
 
     # 移除快取裡多餘的股票
     setting["stock_code"] = new_code
@@ -67,12 +72,3 @@ def update_code_section(symbols: list[str]):
     # 其他欄位完全不變
     save_setting(setting)
 
-if __name__ == "__main__":
-    # 例：你要判斷的股票清單
-    test_symbols = [
-        '0050', '0052', '0056', '006208', '00679B', '00687B', '00690',
-        '00692', '00701', '00713', '00728', '00731', '00751B', '00773B',
-        '00850', '00878', '00881', '00888', '1232', '2308', '2317',
-        '2480', '2912', '3711', '8926'
-    ]
-    update_code_section(test_symbols)
