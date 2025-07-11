@@ -13,8 +13,8 @@ from typing import Dict, List
 import pandas as pd
 
 
-from 股票.function import stock_cache
-from 股票.function.StockDataProcessor import StockDataProcessor,FatalError
+from 股票 import stock_cache
+from 股票.StockDataProcessor import StockDataProcessor,FatalError
 
 
 # ──────────────────────────────
@@ -95,7 +95,7 @@ def run() -> None:
 
     #執行前先備份excel檔案
     if excel_config.get("save"):
-        from 股票.function.backup_excel import backup_excel
+        from 股票.backup_excel import backup_excel
 
         backup_excel(
             read_excel["file"],
@@ -141,6 +141,6 @@ if __name__ == "__main__":
     try:
         run()
     except FatalError as exc:
-        logger.error("致命錯誤：%s", exc)
+        logger.error("致命錯誤：%s", exc, exc_info=True)
     except KeyboardInterrupt:
         logger.warning("使用者中斷程式")

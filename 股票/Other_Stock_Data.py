@@ -4,8 +4,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import logging
 
-from ..crawler.fetch_html import fetch_html
-from ..crawler.stock_crawler import *
+from .crawler.fetch_html import fetch_html
+from .crawler.stock_crawler import *
 from .excel_utils import ExcelSession 
 
 logging.basicConfig(
