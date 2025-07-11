@@ -8,7 +8,7 @@ from pathlib import Path
 from .excel_utils import ExcelSession
 from .get_stock import RealtimeStockData   
 from . import classification
-from . import stock_end
+from . import Other_Stock_Data
 from .rename_code_only_sheets import rename_code_only_sheets
 from .stock_add_sheet import ensure_code_sheets
 
@@ -59,10 +59,10 @@ class StockDataProcessor:
             if self.have_changed and self.auto_add_sheet :
                 ensure_code_sheets(xls,code_list )
 
-            # 1. 歷史資料
+            # 1. 額外資料
             try:
                 logger.info("更新歷史資料 …")
-                stock_end.update_data_parallel(xls, self.codes,row_map=row_map)
+                Other_Stock_Data.update_data_parallel(xls, self.codes,row_map=row_map)
                 logger.info("更新歷史資料完成")
             except Exception : 
                 raise FatalError("更新歷史資料失敗") 

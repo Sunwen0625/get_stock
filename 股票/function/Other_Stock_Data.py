@@ -19,7 +19,7 @@ logging.basicConfig(
 logger = logging.getLogger("crawler")
 
 #=============================================================
-class End:
+class OtherStockData:
     def __init__(
             self, 
             code: str, 
@@ -478,7 +478,7 @@ def fetch_html(url: str) -> BeautifulSoup:
         
     
 def fetch_one(code: str, row: int) -> tuple[int, list]:
-    stock = End(code, row)
+    stock = OtherStockData(code, row)
     stock.judge()            # ← 網路抓取 & 解析
     data = stock._build_row()
     return row, data
