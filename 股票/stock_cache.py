@@ -1,27 +1,15 @@
 import json
 import re
-import requests
+
 import twstock
+
+from .crawler.ETF_or_IndividualStock import is_etf
+
 
 SETTING_FILE = "setting.json"
 _CODE_PREFIX_RE = re.compile(r"^(\d{1,5})([A-Za-z]*)$")  # 支援補齊成4~6碼股票代碼
 
-def is_etf(symbol: str) -> bool | None:
-    """利用 Yahoo Finance Search API 判斷代碼是否為 ETF。"""
-    HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; StockScraper/1.0)"}
-    url = f"https://query2.finance.yahoo.com/v1/finance/search?q={symbol}.tw"
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=5)
-        if resp.status_code != 200:
-            raise RuntimeError(f"HTTP {resp.status_code}")
-        data = resp.json()
-        for quote in data.get("quotes", []):
-            if quote.get("typeDisp", "").split(".")[0] == "ETF":
-                return quote.get("quoteType") == "ETF"
-    except Exception as exc:
-        print(f"[WARN] is_etf({symbol}) API error: {exc}")
-        return 
-    return False
+
 
 def normalize_symbol(code: str) -> str:
     """補齊股票代碼前綴 0，例如 '50' → '0050'"""

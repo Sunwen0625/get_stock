@@ -1,8 +1,8 @@
-import requests
-from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import logging
+
+from bs4 import BeautifulSoup
 
 from .crawler.fetch_html import fetch_html
 from .crawler.stock_crawler import *
@@ -171,30 +171,6 @@ class OtherStockData:
         self.現金流 = fetch_cashflow(self.code, fetch_html)
         self._log(f"{self.code} 現金流:{self.現金流}")
 
-    def _is_etf(self,symbol: str) -> bool:
-        """利用 Yahoo Finance Search API 判斷代碼是否為 ETF。
-
-        API: https://query2.finance.yahoo.com/v1/finance/search?q=<symbol>
-        若找不到 API 或 JSON 解析失敗，返回 False（視為個股），並打印警告。
-        """
-        HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; StockScraper/1.0)"}
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={symbol}.tw"
-        try:
-            resp = requests.get(url, headers=HEADERS,timeout=5)
-            if resp.status_code != 200:
-                raise RuntimeError(f"HTTP {resp.status_code}")
-            data = resp.json()
-            for quote in data.get("quotes", []):
-                #logger.info(quote)
-                # 台股符號通常返回形如 "0050.TW"，先取前段比對
-                if quote.get("typeDisp", "").split(".")[0] == "ETF":
-                    return quote.get("quoteType") == "ETF"
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"[WARN] is_etf({symbol}) API error: {exc}")
-        return False
-
-    
-
 
     #判斷
     def judge(self):
@@ -211,8 +187,10 @@ class OtherStockData:
         #判斷是否為ETF
         if self._is_etf_flag is not None:          # 外部已指定 True/False
             is_etf_result = self._is_etf_flag
-        else:                                      # 否則 fallback 用 API 判斷
-            is_etf_result = self._is_etf(self.code)
+        else:
+            # 否則 fallback 用 API 判斷
+            from .crawler.ETF_or_IndividualStock import is_etf                                      
+            is_etf_result = is_etf(self.code)
 
         if is_etf_result:
             self._handle_etf(profile_soup, yahoo_soup)
