@@ -44,7 +44,7 @@
 ```bash
 pip install poetry
 ````
-
+第一次執行請先執行`更新程式碼.bat`以獲取setting.json文件，
 然後執行 `run.bat`，會自動安裝所需模組並執行更新流程。
 
 ---
@@ -53,20 +53,36 @@ pip install poetry
 
 ```jsonc
 {
-  "read_file": "原始資料.xlsx",        // 要讀取代碼的來源檔案
-  "read_sheet": "原始資料.xlsx",              // 資料代碼所在的工作表
+  "read_excel": {
+        "file": "99.xlsx",
+        "sheet": "new title"
+    },
+  "write_excel": {
+        "file": "99.xlsx",
+        "sheet": "new title"
+    },
+   "wait": {
+        "ending_wait": false
+    },
+   "excel_config": {
+           "save": false,
+           "backup_path": "./excel備份",
+           "backup_filename_format": "{filename}_backup_{timestamp}.xlsx",
+           "excel_auto_close": false,
+           "auto_add_sheet": true
+       },
+    "stock_code": { //第一次執行會自動生成
+         "0050": {
+               "isETF": true, // ETF → true
+               "position": 1
+              },    
+         "2308": {
+                  "isETF": false, // 個股 → false
+                  "position": 20
+              },    
+        },
 
-  "write_file": "結果輸出.xlsx",       // 寫入資料的目標檔案
-  "write_sheet": "結果輸出.xlsx",           // 寫入目標的工作表
 
-  "code": {
-    "0050": true,     // ETF → true
-    "2308": false     // 個股 → false
-    // 可用 stock_cache.update_code_section() 自動補齊此區塊
-  },
-
-  "save": true,        // 是否在最後備份 read_file
-  "ending_wait": true  // 流程結束時是否等待使用者按鍵
 }
 ```
 
