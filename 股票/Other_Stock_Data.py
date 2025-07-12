@@ -73,24 +73,24 @@ class OtherStockData:
                 self._buf.clear()
 
     #資料
-    def yesterday_close(self,soup:BeautifulSoup) -> None:
-        self.昨收 = fetch_yesterday_close(soup)
+    def yesterday_close(self) -> None:
+        self.昨收 = fetch_yesterday_close(self.code, fetch_html)
         self._log(f"{self.code} 昨收:{self.昨收}")
 
                 
     #管理費
-    def ManagementFee(self,soup:BeautifulSoup) -> None:
-        self.管理費 = fetch_management_fee(soup)
+    def ManagementFee(self) -> None:
+        self.管理費 = fetch_management_fee(self.code, fetch_html)
         self._log(f"{self.code} 管理費:{self.管理費}")
 
-    def 股息發放日_ETF(self,soup: BeautifulSoup) -> None:
-        self.股息發放日 = fetch_etf_dividend_date(soup)
+    def 股息發放日_ETF(self) -> None:
+        self.股息發放日 = fetch_etf_dividend_date(self.code, fetch_html)
         self._log(f"{self.code} 股息發放日:{self.股息發放日}")
     
         
     #-------------------------------------------------------------------------------------------
-    def 股息發放日_person(self,soup: BeautifulSoup) -> None:
-        self.股息發放日 = fetch_person_dividend_date(soup)
+    def 股息發放日_person(self) -> None:
+        self.股息發放日 = fetch_person_dividend_date(self.code, fetch_html)
         self._log(f"{self.code} 股息發放日:{self.股息發放日}")
         
 
@@ -125,8 +125,8 @@ class OtherStockData:
         
 
     #每股淨值
-    def NAVPS(self,soup:BeautifulSoup) -> None:
-        self.每股淨值 = fetch_navps(soup)
+    def NAVPS(self) -> None:
+        self.每股淨值 = fetch_navps(self.code, fetch_html)
         self._log(f"{self.code} 每股淨值:{self.每股淨值}")
         
         
@@ -174,15 +174,6 @@ class OtherStockData:
 
     #判斷
     def judge(self):
-        base_url = f"https://tw.stock.yahoo.com/quote/{self.code}"
-        profile_url = f"{base_url}/profile"
-
-        yahoo_soup   = fetch_html(base_url)
-        profile_soup = fetch_html(profile_url)
-        #获取股票代码
-        self.current_code = yahoo_soup.find_all("title")
-        #logger.info(f"\n {self.current_code}")
-
 
         #判斷是否為ETF
         if self._is_etf_flag is not None:          # 外部已指定 True/False
@@ -193,16 +184,16 @@ class OtherStockData:
             is_etf_result = is_etf(self.code)
 
         if is_etf_result:
-            self._handle_etf(profile_soup, yahoo_soup)
+            self._handle_etf()
         else:
-            self._handle_stock(profile_soup, yahoo_soup)
+            self._handle_stock()
 
-    def _handle_etf(self, profile_soup: BeautifulSoup, yahoo_soup: BeautifulSoup):
+    def _handle_etf(self):
         threads=[]
-        threads.append(threading.Thread(target=self.ManagementFee, args=(profile_soup,)))
-        threads.append(threading.Thread(target=self.股息發放日_ETF, args=(profile_soup,)))
+        threads.append(threading.Thread(target=self.ManagementFee))
+        threads.append(threading.Thread(target=self.股息發放日_ETF))
         threads.append(threading.Thread(target=self.財務報表))
-        threads.append(threading.Thread(target=self.yesterday_close, args=(yahoo_soup,)))
+        threads.append(threading.Thread(target=self.yesterday_close))
         for thread in threads:
             thread.start()
         for thread in threads:
@@ -210,20 +201,20 @@ class OtherStockData:
         self._flush_log()     
 
 
-    def _handle_stock(self, profile_soup: BeautifulSoup, yahoo_soup: BeautifulSoup):
+    def _handle_stock(self):
         threads=[]
         threads.append(threading.Thread(target=self.get_PE))
         threads.append(threading.Thread(target=self.get_PB))
         threads.append(threading.Thread(target=self.杜邦分析))
-        threads.append(threading.Thread(target=self.NAVPS,args=(profile_soup,)))
+        threads.append(threading.Thread(target=self.NAVPS))
         threads.append(threading.Thread(target=self.三率))
         threads.append(threading.Thread(target=self.流速動比率))
         threads.append(threading.Thread(target=self.負債比))
         threads.append(threading.Thread(target=self.營運週轉天數))
         threads.append(threading.Thread(target=self.get_利息保障倍數))
         threads.append(threading.Thread(target=self.get_盈餘再投資比))
-        threads.append(threading.Thread(target=self.yesterday_close,args=(yahoo_soup,)))
-        threads.append(threading.Thread(target=self.股息發放日_person,args=(profile_soup,)))
+        threads.append(threading.Thread(target=self.yesterday_close))
+        threads.append(threading.Thread(target=self.股息發放日_person))
         threads.append(threading.Thread(target=self.get_現金流))
         threads.append(threading.Thread(target=self.財務報表))
         for thread in threads:

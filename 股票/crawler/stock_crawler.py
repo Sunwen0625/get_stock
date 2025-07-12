@@ -2,7 +2,9 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag
 
 #昨收(基本資料)
-def fetch_yesterday_close(soup:BeautifulSoup) -> str:
+def fetch_yesterday_close(code: str, fetch_html) -> str:
+    url =f"https://tw.stock.yahoo.com/quote/{code}"
+    soup = fetch_html(url)
     li_elements = soup.select("li.price-detail-item")
     for li in li_elements:
         if "昨收" in li.text:
@@ -12,12 +14,16 @@ def fetch_yesterday_close(soup:BeautifulSoup) -> str:
     return "-"
 
 #管理費
-def fetch_management_fee(soup: BeautifulSoup) -> str:
+def fetch_management_fee(code: str, fetch_html) -> str:
+    url =f"https://tw.stock.yahoo.com/quote/{code}/profile"
+    soup = fetch_html(url)
     elem = soup.find("div", class_="Py(8px) Pstart(12px) Bxz(bb) etf-management-fee")
     return elem.text if elem else "-"
 
 #股息發放日_ETF
-def fetch_etf_dividend_date(soup:BeautifulSoup) -> str:
+def fetch_etf_dividend_date(code: str, fetch_html) -> str:
+    url =f"https://tw.stock.yahoo.com/quote/{code}/profile"
+    soup = fetch_html(url)
     elements = soup.find_all("div", class_="table-grid Mb(20px) row-fit-half")
     second_element = elements[0]
     if not isinstance(second_element, Tag):
@@ -28,7 +34,9 @@ def fetch_etf_dividend_date(soup:BeautifulSoup) -> str:
     
     
 #股息發放日_person
-def fetch_person_dividend_date(soup: BeautifulSoup) -> str:
+def fetch_person_dividend_date(code: str, fetch_html) -> str:
+    url =f"https://tw.stock.yahoo.com/quote/{code}/profile"
+    soup = fetch_html(url)
     elements = soup.find_all("div", class_="table-grid Mb(20px) row-fit-half", attrs={"style": True})
     second_element=elements[1]
     if not isinstance(second_element, Tag):
@@ -78,7 +86,9 @@ def fetch_dupont(code: str, fetch_html) -> dict:
     }
 
 #每股淨值
-def fetch_navps(soup: BeautifulSoup) -> str:
+def fetch_navps(code: str, fetch_html) -> str:
+    url = f"https://tw.stock.yahoo.com/quote/{code}/profile"
+    soup = fetch_html(url)
     elements = soup.find("div", class_="table-grid Mb(20px) row-fit-half", attrs={"style": True})
     if elements and isinstance(elements, Tag):
         subelements = elements.find_all("div", class_="Py(8px) Pstart(12px) Bxz(bb)")
