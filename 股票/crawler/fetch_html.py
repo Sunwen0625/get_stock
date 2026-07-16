@@ -1,6 +1,12 @@
 import requests
 from bs4 import BeautifulSoup
 import time
+
+# 定義 headers
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
+
 #連接url如果狀態!=200就重抓一次
 def fetch_html(url: str) -> BeautifulSoup:
     """
@@ -19,7 +25,7 @@ def fetch_html(url: str) -> BeautifulSoup:
     RuntimeError: 如果3次请求都失败，抛出运行时异常，包含HTTP状态码和URL信息。
     """
     for _ in range(3):  # 尝试3次
-        resp = requests.get(url, timeout=5)  # 发送GET请求，设置超时时间为5秒
+        resp = requests.get(url, timeout=5, headers=HEADERS)  # 发送GET请求，设置超时时间为5秒，加上headers
         if resp.status_code == 200:  # 如果状态码为200，表示请求成功
             return BeautifulSoup(resp.text, "html.parser")  # 返回BeautifulSoup对象
         time.sleep(1)  # 如果请求失败，等待1秒后重试
