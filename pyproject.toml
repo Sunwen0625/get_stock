@@ -9,11 +9,11 @@ package-mode = false
 [tool.poetry.dependencies]
 python = "^3.11"
 twstock = "^1.4.0"
-xlwings = "^0.33.15"
+xlwings = "^0.36.10"
 requests = "^2.32.4"
 beautifulsoup4 = "^4.13.4"
-pandas = "^2.3.0"
-lxml = "^5.4.0"
+pandas = "^3.0.3"
+lxml = "^6.1.1"
 openpyxl = "^3.1.5"
 
 
