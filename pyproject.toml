@@ -13,7 +13,7 @@ xlwings = "^0.33.15"
 requests = "^2.32.4"
 beautifulsoup4 = "^4.13.4"
 pandas = "^2.3.0"
-lxml = "^5.4.0"
+lxml = ">=5.4,<7.0"
 openpyxl = "^3.1.5"
 
 
