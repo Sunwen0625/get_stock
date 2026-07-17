@@ -105,8 +105,48 @@ class StockDataProcessor:
             ) -> dict[str, int]:
         """
         建立股票代碼到Excel行位置的映射
-        list -> row=2,3,4...
-        dict -> 用 position+1 當 row
+        
+        此方法根據輸入的股票代碼格式，建立代碼與Excel工作表中對應行號的映射關係。
+        支援兩種輸入格式：
+        1. 列表格式：按順序從第2行開始排列
+        2. 字典格式：使用position欄位指定行號位置
+        
+        Args:
+            codes (list[str] | dict[str, dict]): 股票代碼資料
+                - 當為list時：包含股票代碼字串的列表
+                - 當為dict時：以股票代碼為key，包含position欄位的字典為value
+                  格式如：{"2330": {"position": 1}, "2317": {"position": 2}}
+        
+        Returns:
+            dict[str, int]: 股票代碼到Excel行號的映射字典
+                - key: 股票代碼字串
+                - value: 對應的Excel行號（從2開始，因為第1行通常是標題）
+        
+        Raises:
+            ValueError: 當字典格式中存在以下問題時拋出異常：
+                - 某個代碼缺少position欄位
+                - position欄位值重複
+                - position欄位值不連續或不從1開始遞增
+        
+        Examples:
+            >>> # 列表格式輸入
+            >>> codes_list = ["2330", "2317", "3008"]
+            >>> mapping = self._create_position_mapping(codes_list)
+            >>> print(mapping)  # {"2330": 2, "2317": 3, "3008": 4}
+            
+            >>> # 字典格式輸入
+            >>> codes_dict = {
+            ...     "2330": {"position": 2},
+            ...     "2317": {"position": 3},
+            ...     "3008": {"position": 4}
+            ... }
+            >>> mapping = self._create_position_mapping(codes_dict)
+            >>> print(mapping)  # {"2330": 2, "2317": 3, "3008": 4}
+        
+        Note:
+            - 列表格式：row = index + 2（第2行開始排列）
+            - 字典格式：row = position + 1（position建議從1開始，對應Excel第2行）
+            - Excel第1行通常保留給欄位標題
         """
         if isinstance(codes, dict):
             positions = []

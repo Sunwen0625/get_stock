@@ -279,7 +279,7 @@ def update_data_parallel(session: ExcelSession,
         etf_map = {code: info.get("isETF", False) for code, info in codes.items()}
     else:
         code_list = codes
-        # 若 codes 為 list，無法判斷 isETF，預設 False
+        # 若 codes 為 list，無法判斷 isETF，預設 none
         etf_map = {code: None for code in code_list}
     
     # 2) 建立 ThreadPoolExecutor，提交所有任務
